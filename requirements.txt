@@ -1,0 +1,19 @@
+# FastAPI and core dependencies
+fastapi
+uvicorn[standard]
+pydantic[email]
+pydantic-settings
+python-dotenv
+
+# AI generation
+openai
+
+# Database
+sqlalchemy
+alembic
+psycopg2-binary
+
+# Authentication and security
+python-jose[cryptography]
+bcrypt
+python-multipart

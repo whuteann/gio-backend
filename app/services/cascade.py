@@ -1,0 +1,112 @@
+"""The shared side-effect cascade triggered by completing a check-in or an
+Inner Reading — a Python port of AppStateContext.tsx#applyReflectionSideEffects.
+
+One submission fans out into: a new InnerStateSnapshot -> XP award -> quest
+completion (+ a same-day bonus if all three daily quests are done) -> streak
+update -> garden update -> badge evaluation -> reward evaluation -> a new
+RecommendationProfile snapshot. This is exactly the cross-cutting design note
+flagged in docs/api-endpoints-draft.md: it all happens here, server-side, in
+one DB transaction (the caller commits once, after this returns).
+
+`narrative_content` (the six AI-generated Inner State fields, see
+docs/behaviour_log_0006.md Phase 4) is optional and check-in-specific for
+now — Inner Reading passes None and the snapshot's narrative fields stay
+null, same as before this pass. This function itself makes no AI calls;
+the caller generates narrative_content beforehand and just hands it in.
+"""
+
+import uuid
+from datetime import datetime, timezone
+
+from sqlalchemy.orm import Session
+
+from app.models.gamification import UserBadge
+from app.models.reflection import InnerReading, InnerStateSnapshot
+from app.models.user import User
+from app.services import gamification as gam
+from app.services.entitlement import is_premium_active
+from app.services.recommendation import build_recommendation
+from app.services.scoring import resolve_focus_key
+
+
+def apply_reflection_side_effects(
+    db: Session,
+    user: User,
+    *,
+    quest_key: str,  # "CHECK_IN" | "INNER_READING"
+    xp_amount: int,
+    dims: dict[str, int],
+    source_type: str,
+    check_in_session_id: uuid.UUID | None = None,
+    inner_reading_id: uuid.UUID | None = None,
+    core_personality_id: uuid.UUID | None,
+    personality_title: str | None,
+    narrative_content: dict[str, str] | None = None,
+) -> dict:
+    now = datetime.now(timezone.utc)
+    today = gam.today_utc()
+
+    focus_key = resolve_focus_key(dims)
+
+    snapshot = InnerStateSnapshot(
+        id=uuid.uuid4(), user_id=user.id, source_type=source_type,
+        check_in_session_id=check_in_session_id, inner_reading_id=inner_reading_id,
+        emotional_energy=dims["emotional_energy"], mental_clarity=dims["mental_clarity"],
+        inner_pressure=dims["inner_pressure"], grounding=dims["grounding"],
+        current_focus={"en": narrative_content["current_focus"], "zh": None} if narrative_content else None,
+        insight={"en": narrative_content["insight"], "zh": None} if narrative_content else None,
+        reflection_question={"en": narrative_content["reflection_question"], "zh": None} if narrative_content else None,
+        reminder={"en": narrative_content["reminder"], "zh": None} if narrative_content else None,
+        friendly_advice={"en": narrative_content["friendly_advice"], "zh": None} if narrative_content else None,
+        affirmation={"en": narrative_content["affirmation"], "zh": None} if narrative_content else None,
+        created_at=now,
+    )
+    db.add(snapshot)
+    db.flush()
+
+    xp_awarded = gam.award_xp(db, user.id, xp_amount, quest_key, f"{quest_key}:{today.isoformat()}")
+    gam.complete_quest(db, user.id, quest_key, today)
+
+    bonus_awarded = False
+    if gam.all_three_quests_complete(db, user.id, today):
+        bonus = gam.award_xp(db, user.id, 10, "DAILY_QUEST_BONUS", f"DAILY_QUEST_BONUS:{today.isoformat()}")
+        bonus_awarded = bonus > 0
+
+    milestone = gam.update_streak_for_reflection(db, user.id, today)
+    if milestone:
+        milestone_xp = gam.STREAK_MILESTONE_XP[milestone]
+        gam.award_xp(db, user.id, milestone_xp, "STREAK_MILESTONE", f"STREAK_MILESTONE:{milestone}")
+
+    garden = gam.update_garden_for_reflection(db, user.id, today)
+    db.flush()
+
+    streak = gam.get_or_create_streak(db, user.id)
+    # The caller flushes the new CheckInSession/InnerReading row before
+    # calling this, so a COMPLETED reading submitted just now is already
+    # visible to this count within the same transaction.
+    readings_count = db.query(InnerReading).filter_by(user_id=user.id, status="COMPLETED").count()
+    total_xp_amount = gam.total_xp(db, user.id)
+
+    new_badges = gam.evaluate_badges(
+        db, user.id, streak_best=streak.best, readings_count=readings_count,
+        garden_stage=garden.stage, total_xp_amount=total_xp_amount,
+    )
+    db.flush()
+    badge_keys = [r[0] for r in db.query(UserBadge.badge_key).filter_by(user_id=user.id).all()]
+    gam.evaluate_rewards(db, user.id, xp=total_xp_amount, streak_best=streak.best, badge_keys=badge_keys)
+
+    recommendation = build_recommendation(
+        db, user_id=user.id, snapshot=snapshot, core_personality_id=core_personality_id,
+        focus_key=focus_key, personality_title=personality_title,
+        trigger_type=source_type, trigger_check_in_session_id=check_in_session_id, trigger_inner_reading_id=inner_reading_id,
+        is_premium=is_premium_active(user.subscription),
+    )
+    snapshot.colour_key = recommendation.colour_key
+
+    return {
+        "snapshot": snapshot,
+        "xp_awarded": xp_awarded,
+        "bonus_awarded": bonus_awarded,
+        "milestone": milestone,
+        "new_badges": new_badges,
+    }

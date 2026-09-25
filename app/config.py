@@ -11,6 +11,15 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 30
     openai_api_key: str = ""
     openai_model: str = "gpt-4.1"
+    # Xendit payment gateway (docs/behaviour_log_0009.md). Xendit has no
+    # separate sandbox hostname — test vs live is purely which secret key
+    # is configured here, both against the same api.xendit.co. `xendit_environment`
+    # is informational only (a UI/log banner), never used to pick a URL.
+    xendit_secret_key: str = ""
+    xendit_webhook_token: str = ""
+    xendit_success_redirect_url: str = "http://localhost:3000/membership/payment-success"
+    xendit_failure_redirect_url: str = "http://localhost:3000/membership/payment-failed"
+    xendit_environment: str = "sandbox"
     # Comma-separated origins allowed to call this API from a browser (the
     # Next.js dev server by default). gio-member-app is the only consumer
     # today, so this is intentionally narrow rather than "*".

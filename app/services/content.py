@@ -7,6 +7,8 @@ pools) — see the "Catalog / reference content" section of
 docs/database-models-draft.md for the reasoning.
 """
 
+from decimal import Decimal
+
 DIMENSIONS = [
     {"key": "emotional_energy", "label": "Emotional Energy", "low_label": "Drained", "high_label": "Energised"},
     {"key": "mental_clarity", "label": "Mental Clarity", "low_label": "Foggy", "high_label": "Clear"},
@@ -184,6 +186,15 @@ REWARD_DEFINITIONS = [
     {"key": "archetype_deep_dive", "title": "Archetype Deep-Dive Report", "description": "An extended written breakdown of your archetype.", "icon": "📜", "requirement": "Earn 3 badges", "is_eligible": _reward_archetype_deep_dive},
 ]
 REWARD_DEFINITIONS_BY_KEY = {r["key"]: r for r in REWARD_DEFINITIONS}
+
+# Premium pricing — deterministic, confirmed pricing (docs/behaviour_log_0009.md),
+# not something an AI call or a database row should own. Yearly is 12
+# months at the monthly rate, discounted 20%: 19.90 * 12 * 0.80 = 191.04.
+# Displayed and charged as this flat amount — no "effective RM/mo" framing.
+PREMIUM_PRICING = {
+    "MONTHLY": {"amount": Decimal("19.90"), "currency": "MYR"},
+    "YEARLY": {"amount": Decimal("191.04"), "currency": "MYR"},
+}
 
 # (pillar, prompt, optionA{label,weight,pillarValue}, optionB{...})
 BASELINE_ASSESSMENT = [

@@ -1,11 +1,18 @@
+import logging
+import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_current_user, get_db
+from app.models.payment import SubscriptionPayment
 from app.models.user import User
+from app.schemas.payment import CheckoutRequest, CheckoutResponse, SubscriptionPaymentOut
 from app.schemas.user import SubscriptionOut
+from app.services import subscription_payment
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/subscription", tags=["subscription"])
 
@@ -15,19 +22,20 @@ def get_subscription(user: User = Depends(get_current_user)):
     return user.subscription
 
 
-@router.post("/subscribe", response_model=SubscriptionOut)
-def subscribe(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    now = datetime.now(timezone.utc)
-    sub = user.subscription
-    sub.plan = "PREMIUM"
-    sub.status = "ACTIVE"
-    sub.starts_at = now
-    sub.renews_at = now + timedelta(days=30)
-    sub.expires_at = None
-    sub.cancelled_at = None
-    db.commit()
-    db.refresh(sub)
-    return sub
+@router.post("/checkout", response_model=CheckoutResponse, status_code=status.HTTP_201_CREATED)
+def checkout(body: CheckoutRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Create a Xendit invoice for Premium — see docs/behaviour_log_0009.md.
+    Replaces the old no-payment POST /subscribe: Premium is now only
+    granted once the webhook below confirms payment, never on request."""
+    payment = subscription_payment.checkout(db, user, body.billing_cycle.upper())
+    return CheckoutResponse(
+        payment_id=payment.id,
+        invoice_url=payment.invoice_url or "",
+        amount=float(payment.amount),
+        currency=payment.currency,
+        billing_cycle=payment.billing_cycle,
+        status=payment.status,
+    )
 
 
 @router.post("/cancel", response_model=SubscriptionOut)
@@ -64,3 +72,36 @@ def start_trial(user: User = Depends(get_current_user), db: Session = Depends(ge
     db.commit()
     db.refresh(sub)
     return sub
+
+
+@router.get("/payments", response_model=list[SubscriptionPaymentOut])
+def list_payments(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """A user's own billing/invoice history — see docs/behaviour_log_0009.md
+    Phase 4.5. Simple and printable on the frontend; this is just the
+    read path."""
+    return (
+        db.query(SubscriptionPayment)
+        .filter_by(user_id=user.id)
+        .order_by(SubscriptionPayment.created_at.desc())
+        .all()
+    )
+
+
+@router.post("/webhook/xendit")
+async def xendit_webhook(request: Request, db: Session = Depends(get_db)):
+    """Xendit calls this directly — no user auth, protected by the
+    x-callback-token header instead. Never treat a frontend redirect as
+    proof of payment; only this webhook (or /sync-xendit below) grants
+    Premium."""
+    callback_token = request.headers.get("x-callback-token")
+    payload = await request.json()
+    logger.info("Xendit webhook for external_id=%s", payload.get("external_id"))
+    return subscription_payment.handle_xendit_webhook(db, payload, callback_token)
+
+
+@router.post("/sync-xendit/{payment_id}")
+def sync_xendit_payment(payment_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Manually re-check a payment's Xendit status when a webhook was
+    missed — operational endpoint, no auth dependency (mirrors the
+    reference implementation's own equivalent)."""
+    return subscription_payment.sync_payment(db, payment_id)

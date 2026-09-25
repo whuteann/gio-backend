@@ -8,6 +8,9 @@ python-dotenv
 # AI generation
 openai
 
+# Xendit payment gateway (docs/behaviour_log_0009.md)
+httpx
+
 # Database
 sqlalchemy
 alembic

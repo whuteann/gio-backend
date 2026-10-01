@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict
 class QuestionOut(BaseModel):
     dimension: str
     text: str
+    text_zh: str | None = None
 
 
 class QuestionSetOut(BaseModel):
@@ -64,6 +65,20 @@ class CheckInSessionOut(BaseModel):
     blueprint_version: str
     private_note: str | None
     summary: str | None
+    # AI-generated (docs/behaviour_log_0011.md), parity with InnerReading's
+    # own title/subtitle, for check-in's history/listing cards. Bilingual
+    # since gio-member-app/docs/behaviour_log_0002.md Phase D.
+    title: str | None = None
+    title_zh: str | None = None
+    subtitle: str | None = None
+    subtitle_zh: str | None = None
+    # Listing metadata (category chip + avatar emoji) — always present,
+    # deterministic, computed at serialization time
+    # (scoring.py::checkin_category_and_emoji), not stored columns —
+    # defaults exist only so CheckInSessionOut.model_validate(session)
+    # succeeds before the endpoint's merge supplies the real values.
+    category: str = ""
+    emoji: str = ""
     started_at: datetime
     completed_at: datetime | None
     answers: list[CheckInAnswerOut] = []
@@ -110,6 +125,14 @@ class InnerStateSnapshotOut(BaseModel):
     mental_clarity: int
     inner_pressure: int
     grounding: int
+    # Change vs. this user's previous snapshot (whichever source — check-in
+    # or Inner Reading — came before this one). 0 when there is no previous
+    # snapshot yet, or no change. Only populated by callers that pass
+    # `previous` to from_model(); every other caller gets 0 for all four.
+    emotional_energy_delta: int = 0
+    mental_clarity_delta: int = 0
+    inner_pressure_delta: int = 0
+    grounding_delta: int = 0
     colour_key: str | None
     # The six narrative fields — each stored as one JSONB {"en", "zh"} column
     # on the model (see docs/behaviour_log_0006.md Phase 4), flattened here
@@ -132,7 +155,7 @@ class InnerStateSnapshotOut(BaseModel):
     created_at: datetime
 
     @classmethod
-    def from_model(cls, snapshot) -> "InnerStateSnapshotOut":
+    def from_model(cls, snapshot, previous=None) -> "InnerStateSnapshotOut":
         def bi(field: str) -> tuple[str | None, str | None]:
             value = getattr(snapshot, field) or {}
             return value.get("en"), value.get("zh")
@@ -149,6 +172,10 @@ class InnerStateSnapshotOut(BaseModel):
             check_in_session_id=snapshot.check_in_session_id, inner_reading_id=snapshot.inner_reading_id,
             emotional_energy=snapshot.emotional_energy, mental_clarity=snapshot.mental_clarity,
             inner_pressure=snapshot.inner_pressure, grounding=snapshot.grounding,
+            emotional_energy_delta=snapshot.emotional_energy - previous.emotional_energy if previous else 0,
+            mental_clarity_delta=snapshot.mental_clarity - previous.mental_clarity if previous else 0,
+            inner_pressure_delta=snapshot.inner_pressure - previous.inner_pressure if previous else 0,
+            grounding_delta=snapshot.grounding - previous.grounding if previous else 0,
             colour_key=snapshot.colour_key,
             insight_en=insight_en, insight_zh=insight_zh,
             reflection_question_en=reflection_question_en, reflection_question_zh=reflection_question_zh,

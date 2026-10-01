@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.dependencies import get_current_user, get_db
 from app.models.gamification import UserBadge
 from app.models.user import User
-from app.schemas.gamification import BadgeOut, GardenOut, ProgressOut, StreakOut
+from app.schemas.gamification import BadgeOut, GardenOut, ProgressOut, StreakOut, UnlockedContentOut, UnlockedItemOut
 from app.services import gamification as gam
 from app.services.content import BADGE_DEFINITIONS
 
@@ -41,4 +41,29 @@ def get_progress(user: User = Depends(get_current_user), db: Session = Depends(g
         garden=GardenOut(week_start=garden.week_start.isoformat(), stage=garden.stage, actions_this_week=garden.actions_this_week),
         quests_today=quests,
         badges=badges,
+    )
+
+
+@router.get("/unlocks", response_model=UnlockedContentOut)
+def get_unlocked_content(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """The full curated-library catalog for the dashboard/Tree widgets
+    (docs/behaviour_log_0011.md) — every item, flagged unlocked/locked.
+    Locked items carry no text; the frontend renders them as a black,
+    empty badge."""
+    data = gam.get_unlocked_content(db, user.id)
+
+    def to_items(rows: list[dict]) -> list[UnlockedItemOut]:
+        return [
+            UnlockedItemOut(
+                item_id=r["item_id"], unlocked=r["unlocked"],
+                text_en=r["text_en"], text_zh=r["text_zh"],
+                unlocked_at=r["unlocked_at"].isoformat() if r["unlocked_at"] else None,
+            )
+            for r in rows
+        ]
+
+    return UnlockedContentOut(
+        affirmations=to_items(data["affirmations"]),
+        insights=to_items(data["insights"]),
+        reflection_questions=to_items(data["reflection_questions"]),
     )

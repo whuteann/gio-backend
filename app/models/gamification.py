@@ -77,3 +77,18 @@ class UserReward(Base):
     state = Column(String, nullable=False, default="LOCKED")
     unlocked_at = Column(DateTime(timezone=True), nullable=True)
     redeemed_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class UserUnlockedContent(Base):
+    """One row per curated library item (content.py::AFFIRMATIONS/
+    INSIGHTS/REFLECTION_QUESTIONS) a user has ever been assigned — see
+    docs/behaviour_log_0011.md. Same append-only, never-revoked shape as
+    UserBadge; `item_id` is the library dict's own key (e.g. "AFF07"),
+    not a foreign key — the catalog itself lives in code, not a table."""
+
+    __tablename__ = "user_unlocked_content"
+
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    category = Column(String, primary_key=True)  # AFFIRMATION | INSIGHT | REFLECTION_QUESTION
+    item_id = Column(String, primary_key=True)
+    unlocked_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

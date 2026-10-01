@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session, selectinload
 
 from app.dependencies import get_current_user, get_db
@@ -20,12 +21,19 @@ from app.schemas.reflection import (
 from app.services import gamification as gam
 from app.services.ai_outcome import generate_checkin_outcome
 from app.services.cascade import apply_reflection_side_effects
+from app.services.content import AFFIRMATIONS, INSIGHTS, REFLECTION_QUESTIONS
 from app.services.entitlement import check_in_history_cutoff
-from app.services.narrative import create_narrative_entry, get_or_create_narrative_profile, recent_narrative_summaries
+from app.services.narrative import lock_user, create_narrative_entry, get_or_create_narrative_profile, recent_narrative_summaries
 from app.services.questions import get_or_generate_checkin_question_set, next_check_in_increment
-from app.services.scoring import dimension_averages, focus_label_for, normalize, resolve_focus_key
+from app.services.scoring import checkin_category_and_emoji, dimension_averages, focus_label_for, normalize, resolve_focus_key
 
 router = APIRouter(prefix="/check-ins", tags=["check-ins"])
+
+
+def _serialize(session: CheckInSession) -> CheckInSessionOut:
+    base = CheckInSessionOut.model_validate(session)
+    tag = checkin_category_and_emoji(session)
+    return base.model_copy(update={"category": tag["category"], "emoji": tag["emoji"]})
 
 
 @router.get("/questions", response_model=QuestionSetOut)
@@ -41,6 +49,7 @@ async def get_questions(db: Session = Depends(get_db), user: User = Depends(get_
 
 @router.post("", response_model=CheckInSubmitResponse, status_code=status.HTTP_201_CREATED)
 async def submit_check_in(payload: CheckInSubmitRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    await run_in_threadpool(lock_user, db, user)
     now = datetime.now(timezone.utc)
 
     # Resolved before any mutation — next_check_in_increment reads the
@@ -76,28 +85,36 @@ async def submit_check_in(payload: CheckInSubmitRequest, user: User = Depends(ge
     recent_summaries = recent_narrative_summaries(db, narrative_profile)
 
     ai_outcome = await generate_checkin_outcome(
-        dims=dims, focus_label=focus_label, recent_narrative_summaries=recent_summaries,
+        dims=dims, focus_label=focus_label, focus_key=focus_key, recent_narrative_summaries=recent_summaries,
     )
+    affirmation_id = ai_outcome.affirmation_id.value
+    insight_id = ai_outcome.insight_id.value
+    reflection_question_id = ai_outcome.reflection_question_id.value
 
-    outcome = apply_reflection_side_effects(
-        db, user, quest_key="CHECK_IN", xp_amount=10, dims=dims, source_type="CHECK_IN",
+    outcome = await run_in_threadpool(
+        apply_reflection_side_effects, db, user, quest_key="CHECK_IN", xp_amount=10, dims=dims, source_type="CHECK_IN",
         check_in_session_id=session.id,
         core_personality_id=personality.id if personality else None,
         personality_title=personality_title,
         narrative_content={
-            "insight": ai_outcome.insight,
-            "reflection_question": ai_outcome.reflection_question,
-            "reminder": ai_outcome.reminder,
-            "current_focus": ai_outcome.current_focus,
-            "friendly_advice": ai_outcome.friendly_advice,
-            "affirmation": ai_outcome.affirmation,
+            "insight": INSIGHTS[insight_id],
+            "reflection_question": REFLECTION_QUESTIONS[reflection_question_id],
+            "reminder": {"en": ai_outcome.reminder.en, "zh": ai_outcome.reminder.zh},
+            "current_focus": {"en": ai_outcome.current_focus.en, "zh": ai_outcome.current_focus.zh},
+            "friendly_advice": {"en": ai_outcome.friendly_advice.en, "zh": ai_outcome.friendly_advice.zh},
+            "affirmation": AFFIRMATIONS[affirmation_id],
         },
+        affirmation_id=affirmation_id, insight_id=insight_id, reflection_question_id=reflection_question_id,
     )
 
     narrative_entry = create_narrative_entry(
         db, narrative_profile, source_type="CHECK_IN", summary=ai_outcome.narrative_summary,
         check_in_session_id=session.id,
     )
+    session.title = ai_outcome.title.en
+    session.title_zh = ai_outcome.title.zh
+    session.subtitle = ai_outcome.subtitle.en
+    session.subtitle_zh = ai_outcome.subtitle.zh
     # Deterministic, not AI — see docs/behaviour_log_0006.md's resolved
     # open question: NarrativeEntry.summary is the one AI-facing memory
     # record for this event; CheckInSession.summary is just a short label.
@@ -124,7 +141,8 @@ def list_check_ins(user: User = Depends(get_current_user), db: Session = Depends
     query = db.query(CheckInSession).options(selectinload(CheckInSession.answers)).filter_by(user_id=user.id)
     if cutoff:
         query = query.filter(CheckInSession.started_at >= cutoff)
-    return query.order_by(CheckInSession.started_at.desc()).all()
+    sessions = query.order_by(CheckInSession.started_at.desc()).all()
+    return [_serialize(s) for s in sessions]
 
 
 @router.get("/{session_id}", response_model=CheckInSessionOut)
@@ -137,7 +155,7 @@ def get_check_in(session_id: uuid.UUID, user: User = Depends(get_current_user), 
     )
     if not session:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Check-in not found.")
-    return session
+    return _serialize(session)
 
 
 @router.get("/{session_id}/results", response_model=CheckInResultsOut)
@@ -153,6 +171,6 @@ def get_check_in_results(session_id: uuid.UUID, user: User = Depends(get_current
 
     snapshot = db.query(InnerStateSnapshot).filter_by(check_in_session_id=session.id).first()
     return CheckInResultsOut(
-        session=CheckInSessionOut.model_validate(session),
+        session=_serialize(session),
         snapshot=InnerStateSnapshotOut.from_model(snapshot) if snapshot else None,
     )

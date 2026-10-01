@@ -17,12 +17,35 @@ DIMENSIONS = [
 ]
 DIMENSION_KEYS = [d["key"] for d in DIMENSIONS]
 
+# focus_zh/summary_zh: deterministic translations, not AI-written — same
+# principle as AFFIRMATIONS/INSIGHTS below. Feeds RecommendationProfile's
+# current_focus_zh/summary_zh (docs/behaviour_log_0012.md).
 FOCUS_COPY = {
-    "emotional_energy": {"focus": "Rebuilding energy", "summary": "Your reserves are running low — small, gentle recharge matters most right now."},
-    "mental_clarity": {"focus": "Finding clarity", "summary": "Things feel a little foggy. A slower pace could help the picture sharpen."},
-    "inner_pressure": {"focus": "Releasing pressure", "summary": "You're carrying more than usual — this is a good moment to set something down."},
-    "grounding": {"focus": "Regaining grounding", "summary": "You feel a little untethered. Reconnecting with routine could help you settle."},
-    "balanced": {"focus": "Sustaining balance", "summary": "You're in a steady place across the board — a good moment to build on momentum."},
+    "emotional_energy": {
+        "focus": "Rebuilding energy", "focus_zh": "重建能量",
+        "summary": "Your reserves are running low — small, gentle recharge matters most right now.",
+        "summary_zh": "你的储备正在减少——此刻最重要的是温和地小小充电。",
+    },
+    "mental_clarity": {
+        "focus": "Finding clarity", "focus_zh": "寻找清晰",
+        "summary": "Things feel a little foggy. A slower pace could help the picture sharpen.",
+        "summary_zh": "一切感觉有些模糊。放慢脚步，画面会渐渐清晰。",
+    },
+    "inner_pressure": {
+        "focus": "Releasing pressure", "focus_zh": "释放压力",
+        "summary": "You're carrying more than usual — this is a good moment to set something down.",
+        "summary_zh": "你此刻承担得比平常更多——是时候放下一些东西了。",
+    },
+    "grounding": {
+        "focus": "Regaining grounding", "focus_zh": "重新扎根",
+        "summary": "You feel a little untethered. Reconnecting with routine could help you settle.",
+        "summary_zh": "你感觉有些漂浮不定。回归日常习惯能帮你安定下来。",
+    },
+    "balanced": {
+        "focus": "Sustaining balance", "focus_zh": "维持平衡",
+        "summary": "You're in a steady place across the board — a good moment to build on momentum.",
+        "summary_zh": "你目前整体处于稳定状态——正是乘势而上的好时机。",
+    },
 }
 
 # Inner Reading listing metadata (category chip + avatar emoji), keyed by
@@ -30,12 +53,101 @@ FOCUS_COPY = {
 # FOCUS_COPY above. Ports the values gio-member-app's old client-side
 # FOCUS_TAG constant used to compute locally from a mock reading's
 # dimensionScores; now served by the API instead (InnerReadingOut).
-READING_CATEGORY = {
+FOCUS_CATEGORY = {
     "emotional_energy": {"category": "Personal", "emoji": "🌙"},
     "mental_clarity": {"category": "Decision Making", "emoji": "🌊"},
     "inner_pressure": {"category": "Work", "emoji": "🌿"},
     "grounding": {"category": "Recovery", "emoji": "🪨"},
     "balanced": {"category": "Reflection", "emoji": "✨"},
+}
+
+# Curated affirmation/insight/reflection-question library —
+# docs/behaviour_log_0011.md. The AI's job for these three fields moved
+# from free generation to *selecting* the best-fitting id from here
+# (grounded on dims/focus/memory, same inputs as before); the resolved
+# bilingual text below is what actually gets stored/shown. Deterministic
+# content, not AI-written — same principle as FOCUS_COPY/FOCUS_CATEGORY.
+# Every id here also doubles as a gamification "unlock" key
+# (UserUnlockedContent) — the first time an id is selected for a user,
+# it's added to their permanent collection.
+AFFIRMATIONS = {
+    "AFF01": {"en": "I am steady, even when things around me are not.", "zh": "即使身边风雨不定，我依然稳如磐石。"},
+    "AFF02": {"en": "I can move forward without forcing everything into place.", "zh": "我可以向前迈进，无需强求一切就位。"},
+    "AFF03": {"en": "My energy will return; I don't have to force it today.", "zh": "我的能量终会回来，今天无需勉强。"},
+    "AFF04": {"en": "I am allowed to rest without earning it first.", "zh": "我值得休息，不必先证明自己配得上。"},
+    "AFF05": {"en": "Clarity comes when I stop demanding it.", "zh": "当我不再强求时，清晰自会浮现。"},
+    "AFF06": {"en": "I trust myself to figure this out, one step at a time.", "zh": "我相信自己能一步一步理清一切。"},
+    "AFF07": {"en": "I don't have to carry everything at full intensity.", "zh": "我不必用尽全力扛起一切。"},
+    "AFF08": {"en": "I am capable of holding both effort and ease.", "zh": "我既能努力，也能从容。"},
+    "AFF09": {"en": "Small steps still count as moving forward.", "zh": "小小的步伐，依然是前进。"},
+    "AFF10": {"en": "I release what isn't mine to carry.", "zh": "我放下那些本不属于我的重担。"},
+    "AFF11": {"en": "I am grounded in who I am, not what I do.", "zh": "我的根基是我是谁，而非我做了什么。"},
+    "AFF12": {"en": "My feelings are information, not instructions.", "zh": "我的情绪是讯息，而非命令。"},
+    "AFF13": {"en": "I can be gentle with myself and still grow.", "zh": "我可以温柔待己，同时依然成长。"},
+    "AFF14": {"en": "Today's pace is enough.", "zh": "今天的步调，已经足够。"},
+    "AFF15": {"en": "I am building something steady, one day at a time.", "zh": "我正一天天地，建立稳固的自己。"},
+    "AFF16": {"en": "I don't need to have it all figured out yet.", "zh": "我不必现在就把一切想清楚。"},
+    "AFF17": {"en": "I choose calm over urgency where I can.", "zh": "能选择时，我选择平静而非匆忙。"},
+    "AFF18": {"en": "I am exactly where I need to be right now.", "zh": "此刻，我正处在该在的地方。"},
+    "AFF19": {"en": "My worth isn't measured by how much I get done.", "zh": "我的价值，不由完成多少事来衡量。"},
+    "AFF20": {"en": "I trust the process, even when I can't see the outcome.", "zh": "即使看不见结果，我依然相信过程。"},
+}
+
+REFLECTION_QUESTIONS = {
+    "REF01": {"en": "What would it feel like to do less today, on purpose?", "zh": "如果今天刻意少做一些，会是什么感觉？"},
+    "REF02": {"en": "What's one thing you're carrying that isn't actually yours?", "zh": "有哪一件事，其实并不是你该扛的？"},
+    "REF03": {"en": "Where could you build in five quiet minutes today?", "zh": "今天你能在哪里挤出五分钟的安静？"},
+    "REF04": {"en": "What's the smallest version of progress you'd accept today?", "zh": "今天你能接受的、最小的进步是什么？"},
+    "REF05": {"en": "What are you afraid will happen if you slow down?", "zh": "如果放慢脚步，你担心会发生什么？"},
+    "REF06": {"en": "Who or what recharges you, and when did you last make time for it?", "zh": "什么人或事能让你充电？你上次留时间给它是什么时候？"},
+    "REF07": {"en": "What's one expectation you could quietly let go of this week?", "zh": "这周你能悄悄放下哪一项期待？"},
+    "REF08": {"en": "What does \"enough\" look like for you today?", "zh": "对你来说，今天的\"足够\"是什么样子？"},
+    "REF09": {"en": "What pattern do you notice repeating in how you feel lately?", "zh": "最近你的情绪中，反复出现了什么模式？"},
+    "REF10": {"en": "What would you tell a friend feeling exactly this way?", "zh": "如果朋友有同样的感受，你会对他说什么？"},
+    "REF11": {"en": "What's one small thing that's actually going well right now?", "zh": "此刻，有哪件小事其实进展得不错？"},
+    "REF12": {"en": "Where are you being harder on yourself than the situation calls for?", "zh": "在哪件事上，你对自己比情况所需更苛刻？"},
+    "REF13": {"en": "What's underneath the tiredness — is it physical, or something else?", "zh": "疲惫底下是什么？是身体，还是别的原因？"},
+    "REF14": {"en": "What would it look like to trust yourself a little more today?", "zh": "今天多信任自己一点，会是什么样子？"},
+    "REF15": {"en": "What's one boundary that would make today feel lighter?", "zh": "设下哪一条界限，会让今天轻松一些？"},
+    "REF16": {"en": "What are you making more complicated than it needs to be?", "zh": "有什么事，被你想得比实际更复杂？"},
+    "REF17": {"en": "What's one thing you can control today, when so much feels uncertain?", "zh": "在诸多不确定中，今天你能掌控的是什么？"},
+    "REF18": {"en": "How would you know if you were actually taking care of yourself?", "zh": "你怎么知道自己是否真正在照顾自己？"},
+    "REF19": {"en": "What's the story you're telling yourself about today, and is it true?", "zh": "你在对自己讲一个怎样的\"今天\"的故事？它真实吗？"},
+    "REF20": {"en": "What would \"good enough\" look like, instead of perfect?", "zh": "如果不追求完美，\"足够好\"会是什么样子？"},
+}
+
+INSIGHTS = {
+    "INS01": {"en": "Your reserves are running low — today's task is recovery, not achievement.", "zh": "你的能量储备正在减少——今天的任务是恢复，而非成就。"},
+    "INS02": {"en": "There's a quiet tiredness beneath the surface that's worth naming.", "zh": "表面之下有一种安静的疲惫，值得被看见。"},
+    "INS03": {"en": "Your energy dips are a reminder that rest is productive too.", "zh": "能量的起伏提醒着你，休息也是一种成效。"},
+    "INS04": {"en": "Low energy isn't failure — it's a signal to slow down.", "zh": "低能量不是失败，而是放慢脚步的信号。"},
+    "INS05": {"en": "Your thoughts are carrying more static than usual right now.", "zh": "此刻你的思绪比平时更多了些杂音。"},
+    "INS06": {"en": "Fog usually means bandwidth, not ability — it will lift.", "zh": "迷雾通常关乎精力，而非能力——它终会散去。"},
+    "INS07": {"en": "Clarity returns with less input, not more effort.", "zh": "清晰往往在减少输入、而非加倍努力时回归。"},
+    "INS08": {"en": "Today's uncertainty is temporary, even if it doesn't feel that way.", "zh": "今天的不确定只是暂时的，即使感觉并非如此。"},
+    "INS09": {"en": "You're holding more than usual — some of it isn't yours to carry.", "zh": "你此刻承担得比平常更多——其中有些并不属于你。"},
+    "INS10": {"en": "Pressure builds when expectations outpace capacity — yours have lately.", "zh": "当期待超出承受力时，压力便会累积——你最近正是如此。"},
+    "INS11": {"en": "What feels urgent right now may not be as urgent as it seems.", "zh": "此刻感觉紧迫的事，或许并没有看起来那么紧迫。"},
+    "INS12": {"en": "You tend to take on more than necessary — today shows it.", "zh": "你常常揽下超出必要的责任——今天正是如此。"},
+    "INS13": {"en": "You've been moving fast enough to lose your footing a little.", "zh": "你一直走得很快，以至于有些站不稳脚跟。"},
+    "INS14": {"en": "Feeling untethered is a sign to return to something familiar.", "zh": "漂浮不定时，是时候回到熟悉的事物中去。"},
+    "INS15": {"en": "Small routines matter more than big plans when you feel ungrounded.", "zh": "当你感到不踏实时，小小的日常习惯比宏大计划更重要。"},
+    "INS16": {"en": "Reconnecting with your body can help more than thinking your way through.", "zh": "重新连结身体，往往比一味思考更有帮助。"},
+    "INS17": {"en": "You're in a steady place across the board — a good moment to build.", "zh": "你目前整体处于稳定状态——正是建设的好时机。"},
+    "INS18": {"en": "Nothing urgent stands out today; that itself is worth noticing.", "zh": "今天没有特别紧迫的事，这本身就值得留意。"},
+    "INS19": {"en": "Steadiness like this is a good time to invest in what matters.", "zh": "这样的平稳，正适合投入到真正重要的事情上。"},
+    "INS20": {"en": "You have more capacity than usual — use it intentionally.", "zh": "你现在的余力比平时更多——不妨有意地善用它。"},
+}
+
+# Which insight ids are candidates for a given resolve_focus_key() result —
+# insight is meant to name something specific about the numbers, so unlike
+# the other two libraries it's grounded by focus rather than fully generic.
+INSIGHT_IDS_BY_FOCUS = {
+    "emotional_energy": ["INS01", "INS02", "INS03", "INS04"],
+    "mental_clarity": ["INS05", "INS06", "INS07", "INS08"],
+    "inner_pressure": ["INS09", "INS10", "INS11", "INS12"],
+    "grounding": ["INS13", "INS14", "INS15", "INS16"],
+    "balanced": ["INS17", "INS18", "INS19", "INS20"],
 }
 
 ARCHETYPES = {
@@ -92,7 +204,7 @@ ARCHETYPE_KEYS = list(ARCHETYPES.keys())
 
 COLOURS = {
     "scarlet": {
-        "key": "scarlet", "name": "Scarlet", "swatch": "#c0392b",
+        "key": "scarlet", "name": "Scarlet", "name_zh": "赤红", "swatch": "#c0392b",
         "traits": ["Vitality", "Passion", "Courage"],
         "description": "A bold, energising red that awakens motivation and physical vitality.",
         "article": "Scarlet is the colour of movement — it's what the body reaches for when energy is running low and momentum needs a spark. It's associated with vitality, passion and courage: not recklessness, but the willingness to act on what matters.",
@@ -102,7 +214,7 @@ COLOURS = {
         "negative_traits": ["Impulsive", "Restless", "Impatient", "Quick-tempered", "Overextended"],
     },
     "russet": {
-        "key": "russet", "name": "Russet", "swatch": "#8b4a2b",
+        "key": "russet", "name": "Russet", "name_zh": "赭红", "swatch": "#8b4a2b",
         "traits": ["Stability", "Warmth", "Resilience"],
         "description": "A warm, earthy brown-red that steadies you and restores a sense of resilience.",
         "article": "Russet is the colour of solid ground — the warm brown-red of autumn leaves and turned soil. It carries stability rather than urgency, built slowly through repetition rather than a single grand gesture.",
@@ -112,7 +224,7 @@ COLOURS = {
         "negative_traits": ["Stubborn", "Slow to change", "Guarded", "Overcautious", "Rigid"],
     },
     "gold": {
-        "key": "gold", "name": "Gold", "swatch": "#b9902a",
+        "key": "gold", "name": "Gold", "name_zh": "金黄", "swatch": "#b9902a",
         "traits": ["Confidence", "Abundance", "Radiance"],
         "description": "A warm, radiant gold that reflects confidence and sustained, balanced progress.",
         "article": "Gold is the colour of quiet achievement — not the loud win, but the steady accumulation of effort that's finally visible. It asks you to notice what's already working rather than chase more.",
@@ -122,7 +234,7 @@ COLOURS = {
         "negative_traits": ["Complacent", "Overconfident", "Showy", "Entitled", "Coasting"],
     },
     "forest": {
-        "key": "forest", "name": "Forest", "swatch": "#4a6b3d",
+        "key": "forest", "name": "Forest", "name_zh": "森绿", "swatch": "#4a6b3d",
         "traits": ["Grounding", "Growth", "Renewal"],
         "description": "A deep, grounding green that supports steadiness, emotional recovery and sustainable growth.",
         "article": "Forest is the colour of steady, unhurried growth — the deep green of old trees rather than a new sprout. Especially supportive when pressure has been building: it asks you to root down, not push harder.",
@@ -132,7 +244,7 @@ COLOURS = {
         "negative_traits": ["Withdrawn", "Overcommitted", "Depleted", "Avoidant", "Slow to ask for help"],
     },
     "ocean": {
-        "key": "ocean", "name": "Ocean", "swatch": "#3f8f8a",
+        "key": "ocean", "name": "Ocean", "name_zh": "海蓝", "swatch": "#3f8f8a",
         "traits": ["Calm", "Clarity", "Communication"],
         "description": "A cool, clear blue-teal that supports calm thinking and honest communication.",
         "article": "Ocean is the colour of a clear mind — cool, spacious and unclouded. When thoughts feel tangled, ocean points toward stillness rather than more input: fewer tabs open, one conversation instead of many.",
@@ -145,11 +257,11 @@ COLOURS = {
 COLOUR_ORDER = ["scarlet", "russet", "gold", "forest", "ocean"]
 
 FOCUS_TO_COLOUR = {
-    "Rebuilding energy": {"colour_key": "scarlet", "tags": ["energy", "lift"], "routine": "A 10-minute walk before noon, away from screens."},
-    "Finding clarity": {"colour_key": "ocean", "tags": ["clarity", "focus"], "routine": "Write down the one thing that matters most today, before anything else."},
-    "Releasing pressure": {"colour_key": "forest", "tags": ["release", "calm"], "routine": "Set a 15-minute timer to do nothing but breathe and let your shoulders drop."},
-    "Regaining grounding": {"colour_key": "russet", "tags": ["grounding", "steadiness"], "routine": "Stand barefoot for two minutes and name five things you can feel."},
-    "Sustaining balance": {"colour_key": "gold", "tags": ["calm", "reflection"], "routine": "Keep doing what's working — a short reflection tonight will reinforce it."},
+    "Rebuilding energy": {"colour_key": "scarlet", "tags": ["energy", "lift"], "routine": "A 10-minute walk before noon, away from screens.", "routine_zh": "中午前进行10分钟散步，远离屏幕。"},
+    "Finding clarity": {"colour_key": "ocean", "tags": ["clarity", "focus"], "routine": "Write down the one thing that matters most today, before anything else.", "routine_zh": "先写下今天最重要的一件事，再做其他事情。"},
+    "Releasing pressure": {"colour_key": "forest", "tags": ["release", "calm"], "routine": "Set a 15-minute timer to do nothing but breathe and let your shoulders drop.", "routine_zh": "设定15分钟计时器，只专注呼吸，让肩膀放松下沉。"},
+    "Regaining grounding": {"colour_key": "russet", "tags": ["grounding", "steadiness"], "routine": "Stand barefoot for two minutes and name five things you can feel.", "routine_zh": "赤脚站立两分钟，说出五件你能感觉到的事物。"},
+    "Sustaining balance": {"colour_key": "gold", "tags": ["calm", "reflection"], "routine": "Keep doing what's working — a short reflection tonight will reinforce it.", "routine_zh": "继续做有效的事——今晚简短反思会强化它。"},
 }
 
 BADGE_DEFINITIONS = [
@@ -224,8 +336,14 @@ BASELINE_ASSESSMENT = [
      "option_b": {"label": "Staying open to whatever keeps you moving", "weight": "open_horizon", "pillar_value": 50}},
 ]
 
-JOURNAL_MOODS = ["Calm", "Hopeful", "Tired", "Anxious", "Grateful", "Content", "Overwhelmed", "Energised"]
-JOURNAL_THEMES = ["Growth", "Responsibility", "Relationships", "Self-Care", "Work", "Clarity", "Rest", "Gratitude"]
+JOURNAL_MOODS = [
+    "Calm", "Hopeful", "Tired", "Anxious", "Grateful", "Content", "Overwhelmed", "Energised",
+    "Frustrated", "Sad", "Peaceful", "Excited",
+]
+JOURNAL_THEMES = [
+    "Growth", "Responsibility", "Relationships", "Self-Care", "Work", "Clarity", "Rest", "Gratitude",
+    "Health", "Creativity", "Family", "Identity",
+]
 
 
 def truncate_words(text: str, limit: int = 100) -> str:

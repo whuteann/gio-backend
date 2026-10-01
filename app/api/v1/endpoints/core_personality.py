@@ -50,9 +50,9 @@ async def _generate_secondary_language(core_personality_id: uuid.UUID, birthdate
         setattr(personality, f"title_{language}", content.title)
         setattr(personality, f"subtitle_{language}", content.subtitle)
         setattr(personality, f"overview_{language}", content.overview)
-        setattr(personality, f"birthday_number_content_{language}", content.birthday_number_content)
-        setattr(personality, f"life_path_number_content_{language}", content.life_path_number_content)
-        setattr(personality, f"talent_number_content_{language}", content.talent_number_content)
+        setattr(personality, f"birthday_number_points_{language}", [p.model_dump() for p in content.birthday_number_points])
+        setattr(personality, f"life_path_number_points_{language}", [p.model_dump() for p in content.life_path_number_points])
+        setattr(personality, f"talent_number_points_{language}", [p.model_dump() for p in content.talent_number_points])
         setattr(personality, f"summary_{language}", content.summary)
         personality.generation_status = "READY"
         db.commit()
@@ -114,9 +114,9 @@ async def calculate(
             f"title_{language}": content.title,
             f"subtitle_{language}": content.subtitle,
             f"overview_{language}": content.overview,
-            f"birthday_number_content_{language}": content.birthday_number_content,
-            f"life_path_number_content_{language}": content.life_path_number_content,
-            f"talent_number_content_{language}": content.talent_number_content,
+            f"birthday_number_points_{language}": [p.model_dump() for p in content.birthday_number_points],
+            f"life_path_number_points_{language}": [p.model_dump() for p in content.life_path_number_points],
+            f"talent_number_points_{language}": [p.model_dump() for p in content.talent_number_points],
             f"summary_{language}": content.summary,
         },
     )

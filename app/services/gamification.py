@@ -12,8 +12,16 @@ from datetime import date as date_type, datetime, timedelta, timezone
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models.gamification import GardenProgress, UserBadge, UserQuest, UserReward, UserStreak, XPTransaction
-from app.services.content import REWARD_DEFINITIONS
+from app.models.gamification import (
+    GardenProgress,
+    UserBadge,
+    UserQuest,
+    UserReward,
+    UserStreak,
+    UserUnlockedContent,
+    XPTransaction,
+)
+from app.services.content import AFFIRMATIONS, INSIGHTS, REFLECTION_QUESTIONS, REWARD_DEFINITIONS
 
 STREAK_MILESTONE_XP = {7: 50, 30: 150, 100: 500}
 
@@ -142,3 +150,50 @@ def evaluate_rewards(db: Session, user_id, *, xp: int, streak_best: int, badge_k
             continue
         if reward_def["is_eligible"](ctx):
             db.add(UserReward(user_id=user_id, reward_key=key, state="UNLOCKED", unlocked_at=datetime.now(timezone.utc)))
+
+
+_UNLOCK_CATALOGS = {
+    "AFFIRMATION": AFFIRMATIONS,
+    "INSIGHT": INSIGHTS,
+    "REFLECTION_QUESTION": REFLECTION_QUESTIONS,
+}
+
+
+def record_content_unlock(db: Session, user_id, category: str, item_id: str) -> bool:
+    """Insert-if-not-exists — same append-only, never-revoked shape as
+    evaluate_badges. See docs/behaviour_log_0011.md."""
+    existing = db.query(UserUnlockedContent).filter_by(user_id=user_id, category=category, item_id=item_id).first()
+    if existing:
+        return False
+    db.add(UserUnlockedContent(user_id=user_id, category=category, item_id=item_id))
+    return True
+
+
+def get_unlocked_content(db: Session, user_id) -> dict[str, list[dict]]:
+    """The full 60-item catalog across all 3 categories, each item flagged
+    unlocked/locked. A locked item's text is deliberately withheld here,
+    not just hidden client-side — the frontend renders it as a black,
+    empty badge with no way to learn what it says before earning it."""
+    unlocked = {
+        (r.category, r.item_id): r.unlocked_at
+        for r in db.query(UserUnlockedContent).filter_by(user_id=user_id).all()
+    }
+
+    def build(category: str) -> list[dict]:
+        items = []
+        for item_id, text in _UNLOCK_CATALOGS[category].items():
+            unlocked_at = unlocked.get((category, item_id))
+            if unlocked_at is not None:
+                items.append({
+                    "item_id": item_id, "unlocked": True,
+                    "text_en": text["en"], "text_zh": text["zh"], "unlocked_at": unlocked_at,
+                })
+            else:
+                items.append({"item_id": item_id, "unlocked": False, "text_en": None, "text_zh": None, "unlocked_at": None})
+        return items
+
+    return {
+        "affirmations": build("AFFIRMATION"),
+        "insights": build("INSIGHT"),
+        "reflection_questions": build("REFLECTION_QUESTION"),
+    }

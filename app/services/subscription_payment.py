@@ -32,6 +32,33 @@ def _money(value) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
+def _bypass_checkout(db: Session, user: User, billing_cycle: str, amount: Decimal, currency: str) -> SubscriptionPayment:
+    """PAYMENT_GATEWAY_ENABLED=false path — no Xendit call, no invoice, no
+    money collected. Grants Premium immediately and still writes a real
+    SubscriptionPayment row (status COMPLETED, no xendit_invoice_id) so
+    billing history and _apply_premium's normal state transition both stay
+    accurate — the only thing skipped is the actual payment collection."""
+    now = datetime.now(timezone.utc)
+    payment = SubscriptionPayment(
+        user_id=user.id,
+        billing_cycle=billing_cycle,
+        amount=amount,
+        currency=currency,
+        xendit_invoice_id=None,
+        reference_no=f"GIO-SUB-BYPASS-{uuid.uuid4()}",
+        status="COMPLETED",
+        invoice_url=settings.xendit_success_redirect_url,
+        provider_data={"bypass": True, "reason": "PAYMENT_GATEWAY_ENABLED=false"},
+        paid_at=now,
+    )
+    db.add(payment)
+    _apply_premium(db, user, billing_cycle, now)
+    db.commit()
+    db.refresh(payment)
+    logger.info("Payment gateway disabled — granted Premium to user=%s with no payment collected.", user.id)
+    return payment
+
+
 def checkout(db: Session, user: User, billing_cycle: str) -> SubscriptionPayment:
     if billing_cycle not in PREMIUM_PRICING:
         raise HTTPException(status_code=400, detail="Invalid billing_cycle — must be MONTHLY or YEARLY")
@@ -46,6 +73,9 @@ def checkout(db: Session, user: User, billing_cycle: str) -> SubscriptionPayment
     # implementation's order-row lock; Gio has no order to lock, so this
     # locks the user instead.
     db.query(User).filter(User.id == user.id).with_for_update().first()
+
+    if not settings.payment_gateway_enabled:
+        return _bypass_checkout(db, user, billing_cycle, amount, currency)
 
     existing = (
         db.query(SubscriptionPayment)

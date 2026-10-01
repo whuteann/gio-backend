@@ -12,8 +12,8 @@ from app.services.content import (
     BASELINE_ASSESSMENT,
     COLOUR_ORDER,
     DIMENSION_KEYS,
+    FOCUS_CATEGORY,
     FOCUS_COPY,
-    READING_CATEGORY,
     truncate_words,
 )
 
@@ -68,17 +68,29 @@ def focus_label_for(focus_key: str) -> str:
     return FOCUS_COPY[focus_key]["focus"]
 
 
+def focus_category_and_emoji(dims: dict[str, int]) -> dict:
+    """Category chip + avatar emoji — deterministic from resolve_focus_key(),
+    same principle as focus_label_for(). Shared by both reflection types'
+    listing cards (docs/behaviour_log_0011.md)."""
+    return FOCUS_CATEGORY[resolve_focus_key(dims)]
+
+
 def reading_category_and_emoji(reading) -> dict:
-    """Category chip + avatar emoji for an InnerReading listing card —
-    deterministic from the reading's own stored pillar values via
-    resolve_focus_key(), same principle as focus_label_for(). Missing
-    pillars (an incomplete reading) fall back to the same default (50)
-    dimension_averages() itself uses for a missing answer."""
+    """Category chip + avatar emoji for an InnerReading listing card.
+    Missing pillars (an incomplete reading) fall back to the same default
+    (50) dimension_averages() itself uses for a missing answer."""
     dims = {
         key: (getattr(reading, key) if getattr(reading, key) is not None else 50)
         for key in DIMENSION_KEYS
     }
-    return READING_CATEGORY[resolve_focus_key(dims)]
+    return focus_category_and_emoji(dims)
+
+
+def checkin_category_and_emoji(session) -> dict:
+    """Same idea for a CheckInSession — which stores no pillar columns of
+    its own (unlike InnerReading), so dims are derived from its answers."""
+    answers = [{"dimension": a.dimension, "normalized_value": a.normalized_value} for a in session.answers]
+    return focus_category_and_emoji(dimension_averages(answers))
 
 
 def reading_content_for_plan(reading, premium: bool) -> dict:

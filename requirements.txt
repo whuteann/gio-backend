@@ -11,6 +11,9 @@ openai
 # Xendit payment gateway (docs/behaviour_log_0009.md)
 httpx
 
+# Billing invoice PDFs (app/services/invoice.py)
+reportlab
+
 # Database
 sqlalchemy
 alembic

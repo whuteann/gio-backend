@@ -17,6 +17,7 @@ def get_or_create_narrative_profile(db: Session, user: User) -> NarrativeProfile
     if user.narrative_profile is not None:
         return user.narrative_profile
     profile = NarrativeProfile(id=uuid.uuid4(), user_id=user.id)
+    user.narrative_profile = profile
     db.add(profile)
     db.flush()
     return profile
@@ -42,6 +43,7 @@ def create_narrative_entry(
     summary: str,
     check_in_session_id: uuid.UUID | None = None,
     inner_reading_id: uuid.UUID | None = None,
+    journal_entry_id: uuid.UUID | None = None,
 ) -> NarrativeEntry:
     entry = NarrativeEntry(
         id=uuid.uuid4(),
@@ -49,8 +51,26 @@ def create_narrative_entry(
         source_type=source_type,
         check_in_session_id=check_in_session_id,
         inner_reading_id=inner_reading_id,
+        journal_entry_id=journal_entry_id,
         summary=summary,
     )
     db.add(entry)
     db.flush()
     return entry
+
+
+def lock_user(db: Session, user: User) -> None:
+    """Serialize per-user reflection/journal mutations until the caller commits.
+
+    Async endpoints must run this blocking database operation in a worker thread.
+    Refresh loaded counters after waiting for an earlier transaction.
+    """
+    db.query(User).filter_by(id=user.id).populate_existing().with_for_update().one()
+
+
+def journal_memory(content: str) -> str:
+    """Bounded verbatim excerpt, not an invented mood or AI interpretation."""
+    compact = " ".join(content.split())
+    excerpt = " ".join(compact.split()[:20])[:160]
+    suffix = "…" if len(excerpt) < len(compact) else ""
+    return f"Journal excerpt: {excerpt}{suffix}"

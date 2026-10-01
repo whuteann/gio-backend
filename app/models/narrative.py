@@ -26,18 +26,16 @@ class NarrativeProfile(Base):
 
 
 class NarrativeEntry(Base):
-    """One row per check-in or Inner Reading — the AI's short memory note
-    on that event. Never returned to the client; read back only as
-    grounding context for future Inner State generation (last-10 query,
-    not built in this pass)."""
+    """Private memory per reflection or journal; last five ground future output."""
 
     __tablename__ = "narrative_entries"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     narrative_profile_id = Column(UUID(as_uuid=True), ForeignKey("narrative_profiles.id", ondelete="CASCADE"), nullable=False)
-    source_type = Column(String, nullable=False)  # CHECK_IN | INNER_READING
+    source_type = Column(String, nullable=False)  # CHECK_IN | INNER_READING | JOURNAL
     check_in_session_id = Column(UUID(as_uuid=True), ForeignKey("check_in_sessions.id", ondelete="CASCADE"), nullable=True)
     inner_reading_id = Column(UUID(as_uuid=True), ForeignKey("inner_readings.id", ondelete="CASCADE"), nullable=True)
+    journal_entry_id = Column(UUID(as_uuid=True), ForeignKey("journal_entries.id", ondelete="CASCADE"), nullable=True)
     summary = Column(String, nullable=False)  # ~20-word AI summary
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
@@ -45,10 +43,10 @@ class NarrativeEntry(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "(check_in_session_id IS NOT NULL)::int + (inner_reading_id IS NOT NULL)::int = 1",
+            "(check_in_session_id IS NOT NULL)::int + (inner_reading_id IS NOT NULL)::int + (journal_entry_id IS NOT NULL)::int = 1",
             name="ck_narrative_entry_single_source",
         ),
-        # Serves the "last 10 entries for this profile" query directly —
+        # Serves the "last 5 entries for this profile" query directly —
         # the exact access pattern generation will use.
         Index("ix_narrative_entries_profile_created", "narrative_profile_id", created_at.desc()),
     )

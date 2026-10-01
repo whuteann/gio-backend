@@ -14,8 +14,9 @@ router = APIRouter(prefix="/recommendations", tags=["recommendations"])
 def _serialize(profile: RecommendationProfile) -> RecommendationOut:
     colour = COLOURS[profile.colour_key]
     return RecommendationOut(
-        id=profile.id, current_focus=profile.current_focus, summary=profile.summary,
-        colour_key=colour["key"], colour_name=colour["name"], colour_swatch=colour["swatch"],
+        id=profile.id, current_focus=profile.current_focus, current_focus_zh=profile.current_focus_zh,
+        summary=profile.summary, summary_zh=profile.summary_zh,
+        colour_key=colour["key"], colour_name=colour["name"], colour_name_zh=colour["name_zh"], colour_swatch=colour["swatch"],
         status=profile.status, generated_at=profile.generated_at, items=profile.items,
     )
 

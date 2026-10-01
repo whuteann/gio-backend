@@ -60,21 +60,30 @@ Write the following, entirely in {language_name}:
 - overview: a warm, specific 2-3 sentence description of who this person
   is at their core, grounded in the Birthday/Life Path/Talent Number
   pattern above — not generic personality-quiz language.
-- birthday_number_content: 2-3 sentences interpreting the Birthday Number
-  specifically.
-- life_path_number_content: 2-3 sentences interpreting the Life Path
-  Number specifically.
-- talent_number_content: 2-3 sentences interpreting the Talent Number
-  specifically — natural gifts and potential blind spots, framed as
-  tendencies, not fixed traits.
+- birthday_number_points / life_path_number_points / talent_number_points:
+  each is a list of exactly 3 points interpreting that number — NOT a
+  paragraph split into pieces. Each point stands on its own:
+  * emoji: one well-chosen emoji that actually depicts the idea in that
+    point (a compass for direction, a spark for ignition, roots for
+    grounding) — never a generic decorative filler emoji repeated across
+    points.
+  * text: one short, vivid sentence, 6-12 words. Concrete and specific to
+    this person's numbers, never a restatement of the number itself
+    ("Birthday Number 11 means...") — get straight to the trait, gift, or
+    tendency.
+  For talent_number_points specifically: at least one point should be a
+  natural gift, and at least one a tendency/blind spot worth watching —
+  framed gently, as a pattern, not a flaw.
 - summary: NOT user-facing. A concise (2-3 sentence) factual grounding
   summary of this person's core identity, written to be consumed by another
   AI step downstream that will use it to choose a supportive colour and
-  product recommendations. Plain, dense, no flourishes.
+  product recommendations. Plain, dense, no flourishes — ordinary prose,
+  not points.
 
 Output rules:
 - Return only the fields defined by the response schema.
-- Every field is a plain string (not markdown, no bullet points).
+- title/subtitle/overview/summary are plain strings (no markdown, no bullet
+  points). The three *_points fields are the only point-form content.
 - Write naturally in {language_name} — do not translate word-for-word from
   English if English is not the target language.
 """

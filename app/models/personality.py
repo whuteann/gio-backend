@@ -1,7 +1,7 @@
 import uuid
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, SmallInteger, String
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -32,21 +32,25 @@ class CorePersonality(Base):
     overview_zh = Column(String, nullable=True)
 
     # Numbers themselves are language-neutral — only their narrative content
-    # is bilingual.
+    # is bilingual. Each *_points_{en,zh} column holds a JSON array of
+    # {"emoji": str, "text": str} objects (app/schemas/common.py::NumberPoint)
+    # — point-form content, not a paragraph string (see docs/behaviour_log
+    # for the prompt redesign that replaced the old *_content_{en,zh} text
+    # columns these were migrated from).
     birthday_number = Column(Integer, nullable=True)
-    birthday_number_content_en = Column(String, nullable=True)
-    birthday_number_content_zh = Column(String, nullable=True)
+    birthday_number_points_en = Column(JSONB, nullable=True)
+    birthday_number_points_zh = Column(JSONB, nullable=True)
 
     life_path_number = Column(Integer, nullable=True)
-    life_path_number_content_en = Column(String, nullable=True)
-    life_path_number_content_zh = Column(String, nullable=True)
+    life_path_number_points_en = Column(JSONB, nullable=True)
+    life_path_number_points_zh = Column(JSONB, nullable=True)
 
     # String, not Integer: a richer numerology implementation formats this
     # "XX/N" (e.g. "38/2"), a compound value an Integer column can't hold.
     # Language-neutral, like the other number fields.
     talent_number = Column(String, nullable=True)
-    talent_number_content_en = Column(String, nullable=True)
-    talent_number_content_zh = Column(String, nullable=True)
+    talent_number_points_en = Column(JSONB, nullable=True)
+    talent_number_points_zh = Column(JSONB, nullable=True)
 
     # One column per app/services/content.py::COLOUR_ORDER key — numeric
     # scores, not text, so no language split needed.

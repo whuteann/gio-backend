@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session, selectinload
 
 from app.dependencies import get_current_user, get_db
@@ -18,8 +19,9 @@ from app.schemas.reflection import (
 from app.services import gamification as gam
 from app.services.ai_outcome import generate_reading_outcome
 from app.services.cascade import apply_reflection_side_effects
+from app.services.content import AFFIRMATIONS, INSIGHTS, REFLECTION_QUESTIONS
 from app.services.entitlement import INNER_READING_WEEKLY_FREE_LIMIT, inner_reading_weekly_count, is_premium_active
-from app.services.narrative import create_narrative_entry, get_or_create_narrative_profile, recent_narrative_summaries
+from app.services.narrative import lock_user, create_narrative_entry, get_or_create_narrative_profile, recent_narrative_summaries
 from app.services.questions import get_or_generate_reading_question_set, next_inner_reading_increment
 from app.services.scoring import dimension_averages, focus_label_for, normalize, reading_content_for_plan, resolve_focus_key
 
@@ -48,6 +50,7 @@ async def get_questions(user: User = Depends(get_current_user), db: Session = De
 
 @router.post("", response_model=InnerReadingSubmitResponse, status_code=status.HTTP_201_CREATED)
 async def submit_inner_reading(payload: InnerReadingSubmitRequest, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    await run_in_threadpool(lock_user, db, user)
     premium = is_premium_active(user.subscription)
     if not premium and inner_reading_weekly_count(db, user.id) >= INNER_READING_WEEKLY_FREE_LIMIT:
         raise HTTPException(
@@ -73,8 +76,11 @@ async def submit_inner_reading(payload: InnerReadingSubmitRequest, user: User = 
     recent_summaries = recent_narrative_summaries(db, narrative_profile)
 
     ai_outcome = await generate_reading_outcome(
-        dims=dims, focus_label=focus_label, recent_narrative_summaries=recent_summaries,
+        dims=dims, focus_label=focus_label, focus_key=focus_key, recent_narrative_summaries=recent_summaries,
     )
+    affirmation_id = ai_outcome.affirmation_id.value
+    insight_id = ai_outcome.insight_id.value
+    reflection_question_id = ai_outcome.reflection_question_id.value
 
     reading = InnerReading(
         id=uuid.uuid4(), user_id=user.id, ordinal=_next_ordinal(db, user.id), status="COMPLETED",
@@ -83,7 +89,7 @@ async def submit_inner_reading(payload: InnerReadingSubmitRequest, user: User = 
         inner_pressure=dims["inner_pressure"], grounding=dims["grounding"],
         result_summary=f"Inner Reading — {focus_label}",
         narrative=ai_outcome.narrative,
-        insight=ai_outcome.insight, reflection_question=ai_outcome.reflection_question,
+        insight=INSIGHTS[insight_id]["en"], reflection_question=REFLECTION_QUESTIONS[reflection_question_id]["en"],
         title=ai_outcome.title, subtitle=ai_outcome.subtitle,
         life_area_insights={
             "work": ai_outcome.life_area_work,
@@ -103,19 +109,20 @@ async def submit_inner_reading(payload: InnerReadingSubmitRequest, user: User = 
         ))
     db.flush()
 
-    outcome = apply_reflection_side_effects(
-        db, user, quest_key="INNER_READING", xp_amount=25, dims=dims, source_type="INNER_READING",
+    outcome = await run_in_threadpool(
+        apply_reflection_side_effects, db, user, quest_key="INNER_READING", xp_amount=25, dims=dims, source_type="INNER_READING",
         inner_reading_id=reading.id,
         core_personality_id=personality.id if personality else None,
         personality_title=personality_title,
         narrative_content={
-            "insight": ai_outcome.insight,
-            "reflection_question": ai_outcome.reflection_question,
-            "reminder": ai_outcome.reminder,
-            "current_focus": ai_outcome.current_focus,
-            "friendly_advice": ai_outcome.friendly_advice,
-            "affirmation": ai_outcome.affirmation,
+            "insight": INSIGHTS[insight_id],
+            "reflection_question": REFLECTION_QUESTIONS[reflection_question_id],
+            "reminder": {"en": ai_outcome.reminder.en, "zh": ai_outcome.reminder.zh},
+            "current_focus": {"en": ai_outcome.current_focus.en, "zh": ai_outcome.current_focus.zh},
+            "friendly_advice": {"en": ai_outcome.friendly_advice.en, "zh": ai_outcome.friendly_advice.zh},
+            "affirmation": AFFIRMATIONS[affirmation_id],
         },
+        affirmation_id=affirmation_id, insight_id=insight_id, reflection_question_id=reflection_question_id,
     )
 
     narrative_entry = create_narrative_entry(

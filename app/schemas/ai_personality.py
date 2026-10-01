@@ -1,5 +1,7 @@
 from pydantic import BaseModel
 
+from app.schemas.common import NumberPoint
+
 
 class CorePersonalityGeneration(BaseModel):
     """The text_format schema handed to client.responses.parse — single
@@ -9,7 +11,7 @@ class CorePersonalityGeneration(BaseModel):
     title: str
     subtitle: str
     overview: str
-    birthday_number_content: str
-    life_path_number_content: str
-    talent_number_content: str
+    birthday_number_points: list[NumberPoint]
+    life_path_number_points: list[NumberPoint]
+    talent_number_points: list[NumberPoint]
     summary: str

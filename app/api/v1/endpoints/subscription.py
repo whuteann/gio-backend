@@ -2,7 +2,7 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_current_user, get_db
@@ -11,6 +11,7 @@ from app.models.user import User
 from app.schemas.payment import CheckoutRequest, CheckoutResponse, SubscriptionPaymentOut
 from app.schemas.user import SubscriptionOut
 from app.services import subscription_payment
+from app.services.invoice import generate_invoice_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -84,6 +85,24 @@ def list_payments(user: User = Depends(get_current_user), db: Session = Depends(
         .filter_by(user_id=user.id)
         .order_by(SubscriptionPayment.created_at.desc())
         .all()
+    )
+
+
+@router.get("/payments/{payment_id}/invoice")
+def get_payment_invoice(payment_id: uuid.UUID, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """A real PDF invoice for one payment, generated on the fly
+    (app/services/invoice.py) — works identically for a real Xendit
+    payment and a PAYMENT_GATEWAY_ENABLED=false bypass payment, since
+    both are just SubscriptionPayment rows. `inline`, not `attachment`, so
+    the frontend can open it in a new tab rather than force a download."""
+    payment = db.query(SubscriptionPayment).filter_by(id=payment_id, user_id=user.id).first()
+    if not payment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Payment not found.")
+    pdf_bytes = generate_invoice_pdf(payment, user)
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="gio-invoice-{payment.reference_no}.pdf"'},
     )
 
 

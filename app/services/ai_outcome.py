@@ -10,15 +10,26 @@ themselves. Grounded on the user's own recent NarrativeEntry history (see
 docs/behaviour_log_0005.md/0006.md) so this isn't a cold, context-free
 generation each time.
 
-English-only for now — check-in questions (Phase 2) are English-only for
-the same reason (the app doesn't yet ask for bilingual check-in content);
-revisit together if that changes.
+Affirmation/insight/reflection_question are no longer free-written — the
+model *selects* an id from the curated library (content.py, see
+docs/behaviour_log_0011.md), grounded on the same inputs as before.
+current_focus/friendly_advice/reminder (and check-in's title/subtitle)
+stay freely generated, and are now genuinely bilingual — written directly
+in both languages in the same call, per
+gio-member-app/docs/behaviour_log_0002.md — since their target columns
+(InnerStateSnapshot's JSONB fields) already support it.
+narrative_summary stays English-only deliberately: it's system memory
+(NarrativeEntry.summary), never shown to a user. Inner Reading's own
+record fields (narrative/title/subtitle/life_area_*) also stay
+English-only for now — `InnerReading`'s columns aren't migrated to the
+bilingual JSONB shape yet (behaviour_log_0002.md Phase E).
 """
 
 from openai import AsyncOpenAI
 
 from app.config import settings
 from app.schemas.ai_outcome import CheckInOutcomeGeneration, InnerReadingOutcomeGeneration
+from app.services.content import AFFIRMATIONS, INSIGHT_IDS_BY_FOCUS, INSIGHTS, REFLECTION_QUESTIONS
 
 _client = AsyncOpenAI(api_key=settings.openai_api_key)
 
@@ -28,10 +39,32 @@ _SYSTEM_MESSAGE = (
 )
 
 
+def _candidate_list(items: dict[str, dict[str, str]]) -> str:
+    return "\n".join(f'- {item_id}: "{text["en"]}"' for item_id, text in items.items())
+
+
+def _library_block(focus_key: str) -> str:
+    insight_candidates = {i: INSIGHTS[i] for i in INSIGHT_IDS_BY_FOCUS[focus_key]}
+    return f"""\
+Choose an affirmation_id from this list (pick whichever best fits this
+specific moment — do not invent a new one):
+{_candidate_list(AFFIRMATIONS)}
+
+Choose a reflection_question_id from this list, ideally one that connects
+to the insight you're pointing at:
+{_candidate_list(REFLECTION_QUESTIONS)}
+
+Choose an insight_id from this list only (these are the ones that match
+today's resolved focus — do not pick from outside this list):
+{_candidate_list(insight_candidates)}
+"""
+
+
 async def generate_checkin_outcome(
     *,
     dims: dict[str, int],
     focus_label: str,
+    focus_key: str,
     recent_narrative_summaries: list[str],
 ) -> CheckInOutcomeGeneration:
     if recent_narrative_summaries:
@@ -57,24 +90,30 @@ across entries if one is genuinely present, but don't force a connection
 that isn't there):
 {memory_block}
 
-Write the following, entirely in English:
-- insight: 1-2 sentences naming what today's numbers suggest, specific to
-  this moment.
-- reflection_question: one open question inviting the user to reflect
-  further, connected to the insight above.
+{_library_block(focus_key)}
+
+Write the following:
+- affirmation_id, reflection_question_id, insight_id: as instructed above.
 - reminder: one short, warm reminder for the user to carry with them today.
 - current_focus: a short (2-5 word) phrase naming the user's ongoing
   journey right now, in the spirit of "{focus_label}" but written as
   natural, personal phrasing rather than repeating that label verbatim.
 - friendly_advice: one concrete, small, doable suggestion for today.
-- affirmation: one first-person affirmation statement.
-- narrative_summary: NOT user-facing. A factual, third-person summary of
-  this check-in in 20 words or fewer, written to be read back as memory
-  context for a *future* generation like this one — plain and dense, no
-  flourishes, no direct address to the user.
+- narrative_summary: NOT user-facing, English only regardless of the
+  fields above. A factual, third-person summary of this check-in in 20
+  words or fewer, written to be read back as memory context for a
+  *future* generation like this one — plain and dense, no flourishes, no
+  direct address to the user.
+- title: a short (2-5 word) headline for this check-in, suitable for a
+  history list (e.g. "Steady Ground", "Gentle Reset").
+- subtitle: one short sentence expanding on the title.
 
 Output rules:
-- Every field is a plain string (no markdown, no bullet points).
+- reminder, current_focus, friendly_advice, title, and subtitle are each
+  written in both English (`en`) and Chinese (`zh`) — genuine, natural
+  phrasing in each language, not a literal translation of one into the
+  other. narrative_summary is a single plain string, English only.
+- Every free-text field is plain text (no markdown, no bullet points).
 - Keep each field genuinely short — this is a daily check-in, not an
   essay.
 """
@@ -101,6 +140,7 @@ async def generate_reading_outcome(
     *,
     dims: dict[str, int],
     focus_label: str,
+    focus_key: str,
     recent_narrative_summaries: list[str],
 ) -> InnerReadingOutcomeGeneration:
     if recent_narrative_summaries:
@@ -127,17 +167,15 @@ across entries if one is genuinely present, but don't force a connection
 that isn't there):
 {memory_block}
 
-Write the following, entirely in English:
-- insight: 1-2 sentences naming what today's numbers suggest, specific to
-  this moment.
-- reflection_question: one open question inviting the user to reflect
-  further, connected to the insight above.
+{_library_block(focus_key)}
+
+Write the following, in English unless noted otherwise:
+- affirmation_id, reflection_question_id, insight_id: as instructed above.
 - reminder: one short, warm reminder for the user to carry with them today.
 - current_focus: a short (2-5 word) phrase naming the user's ongoing
   journey right now, in the spirit of "{focus_label}" but written as
   natural, personal phrasing rather than repeating that label verbatim.
 - friendly_advice: one concrete, small, doable suggestion for today.
-- affirmation: one first-person affirmation statement.
 - narrative_summary: NOT user-facing. A factual, third-person summary of
   this reading in 20 words or fewer, written to be read back as memory
   context for a *future* generation like this one — plain and dense, no
@@ -153,11 +191,16 @@ Write the following, entirely in English:
   area — practical, not generic filler.
 
 Output rules:
-- Every field is a plain string (no markdown, no bullet points).
-- insight/reflection_question/reminder/current_focus/friendly_advice/
-  affirmation/narrative_summary stay genuinely short, matching a daily
-  check-in's brevity — narrative, title, subtitle, and the 4 life_area_*
-  fields are where this reading's extra depth belongs.
+- reminder, current_focus, and friendly_advice are each written in both
+  English (`en`) and Chinese (`zh`) — genuine, natural phrasing in each
+  language, not a literal translation of one into the other.
+  narrative_summary, narrative, title, subtitle, and the 4 life_area_*
+  fields are each a single plain string, English only, for now.
+- Every free-text field is plain text (no markdown, no bullet points).
+- reminder/current_focus/friendly_advice/narrative_summary stay genuinely
+  short, matching a daily check-in's brevity — narrative, title, subtitle,
+  and the 4 life_area_* fields are where this reading's extra depth
+  belongs.
 """
 
     response = await _client.responses.parse(

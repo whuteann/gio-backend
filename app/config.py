@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     xendit_success_redirect_url: str = "http://localhost:3000/membership/payment-success"
     xendit_failure_redirect_url: str = "http://localhost:3000/membership/payment-failed"
     xendit_environment: str = "sandbox"
+    # Feature toggle: True (default) keeps the real Xendit checkout flow
+    # exactly as-is. False bypasses it entirely — "Subscribe" grants
+    # Premium immediately, no invoice, no payment collected. For
+    # demos/dev/staging where you don't want a real gateway in the loop;
+    # never flip this in a real production environment.
+    payment_gateway_enabled: bool = True
     # Comma-separated origins allowed to call this API from a browser (the
     # Next.js dev server by default). gio-member-app is the only consumer
     # today, so this is intentionally narrow rather than "*".

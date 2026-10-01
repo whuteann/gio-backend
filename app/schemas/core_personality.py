@@ -3,6 +3,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.common import NumberPoint
+
 
 class CalculateRequest(BaseModel):
     date_of_birth: str = Field(description="YYYY-MM-DD")
@@ -17,16 +19,16 @@ class CorePersonalityResultOut(BaseModel):
     generation_status: str  # PARTIAL | READY
 
     birthday_number: int | None
-    birthday_number_content_en: str | None
-    birthday_number_content_zh: str | None
+    birthday_number_points_en: list[NumberPoint] | None
+    birthday_number_points_zh: list[NumberPoint] | None
 
     life_path_number: int | None
-    life_path_number_content_en: str | None
-    life_path_number_content_zh: str | None
+    life_path_number_points_en: list[NumberPoint] | None
+    life_path_number_points_zh: list[NumberPoint] | None
 
     talent_number: str | None
-    talent_number_content_en: str | None
-    talent_number_content_zh: str | None
+    talent_number_points_en: list[NumberPoint] | None
+    talent_number_points_zh: list[NumberPoint] | None
 
     title_en: str | None
     title_zh: str | None

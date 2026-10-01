@@ -14,10 +14,23 @@ router = APIRouter(prefix="/state-snapshots", tags=["state-snapshots"])
 
 @router.get("/latest", response_model=InnerStateSnapshotOut)
 def get_latest_snapshot(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    snapshot = db.query(InnerStateSnapshot).filter_by(user_id=user.id).order_by(InnerStateSnapshot.created_at.desc()).first()
-    if not snapshot:
+    # Two most recent rows in one query — the second is "previous", used to
+    # compute the dashboard's per-pillar delta (see InnerStateSnapshotOut).
+    # Mixes sources deliberately: a check-in and an Inner Reading share the
+    # same 4 pillars, so "since you last checked in on yourself" is the
+    # intended comparison regardless of which one it was.
+    recent = (
+        db.query(InnerStateSnapshot)
+        .filter_by(user_id=user.id)
+        .order_by(InnerStateSnapshot.created_at.desc())
+        .limit(2)
+        .all()
+    )
+    if not recent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No check-in or Inner Reading yet.")
-    return InnerStateSnapshotOut.from_model(snapshot)
+    snapshot = recent[0]
+    previous = recent[1] if len(recent) > 1 else None
+    return InnerStateSnapshotOut.from_model(snapshot, previous=previous)
 
 
 @router.get("/trend", response_model=TrendOut)

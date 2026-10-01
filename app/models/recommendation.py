@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import CheckConstraint, Column, DateTime, ForeignKey, Numeric, SmallInteger, String
+from sqlalchemy import CheckConstraint, Column, Date, DateTime, ForeignKey, Numeric, SmallInteger, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
@@ -20,6 +20,10 @@ class RecommendationProfile(Base):
     trigger_type = Column(String, nullable=False)  # CHECK_IN | INNER_READING
     trigger_check_in_session_id = Column(UUID(as_uuid=True), ForeignKey("check_in_sessions.id", ondelete="CASCADE"), nullable=True)
     trigger_inner_reading_id = Column(UUID(as_uuid=True), ForeignKey("inner_readings.id", ondelete="CASCADE"), nullable=True)
+    # NULL on historical per-reflection profiles; one bundle per UTC day now.
+    recommendation_date = Column(Date, nullable=True)
+    current_focus_zh = Column(String, nullable=True)
+    summary_zh = Column(String, nullable=True)
     current_focus = Column(String, nullable=False)
     summary = Column(String, nullable=False)
     # Colours are a backend-constant catalog (see app/services/catalog.py), not
@@ -32,6 +36,7 @@ class RecommendationProfile(Base):
     items = relationship("RecommendationItem", order_by="RecommendationItem.rank", cascade="all, delete-orphan")
 
     __table_args__ = (
+        UniqueConstraint("user_id", "recommendation_date", name="uq_recommendation_user_day"),
         CheckConstraint(
             "(trigger_check_in_session_id IS NOT NULL)::int + (trigger_inner_reading_id IS NOT NULL)::int = 1",
             name="ck_recommendation_single_trigger",
@@ -48,9 +53,16 @@ class RecommendationItem(Base):
     )
     type = Column(String, nullable=False)  # COLOUR | ROUTINE | PRODUCT | ...
     reference_id = Column(String, nullable=True)  # e.g. an external product id
+    title_zh = Column(String, nullable=True)
+    reason_zh = Column(String, nullable=True)
+    currency = Column(String, nullable=False, default="MYR", server_default="MYR")
     title = Column(String, nullable=False)
     reason = Column(String, nullable=False)
     rank = Column(SmallInteger, nullable=False)
     image_url = Column(String, nullable=True)
     price = Column(Numeric(10, 2), nullable=True)
     destination_url = Column(String, nullable=True)
+    # PRODUCT items only — the stone/material name as a short display tag
+    # (app/services/ai_recommendation.py). Language-neutral (English only),
+    # like the other PRODUCT-specific fields here.
+    material_tag = Column(String, nullable=True)

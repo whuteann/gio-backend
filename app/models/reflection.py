@@ -71,6 +71,14 @@ class CheckInSession(Base):
     blueprint_version = Column(String, nullable=False)
     private_note = Column(String, nullable=True)
     summary = Column(String, nullable=True)
+    # AI-generated per check-in (docs/behaviour_log_0011.md) — parity with
+    # InnerReading.title/.subtitle, for check-in's own history/listing
+    # cards. category/emoji are computed at serialization time instead
+    # (scoring.py::checkin_category_and_emoji), no column needed.
+    title = Column(String, nullable=True)
+    title_zh = Column(String, nullable=True)
+    subtitle = Column(String, nullable=True)
+    subtitle_zh = Column(String, nullable=True)
     # The NarrativeEntry generated for this check-in (see
     # docs/behaviour_log_0006.md) — SET NULL, not CASCADE, so deleting a
     # narrative entry never takes the check-in it came from down with it.

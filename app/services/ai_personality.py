@@ -33,7 +33,7 @@ async def generate_core_personality_content(
 
     system_message = (
         "You are a warm, insightful numerology and personality expert writing for a "
-        "wellness app called Gio. You must strictly follow the required JSON structure."
+        "wellness app called Auren. You must strictly follow the required JSON structure."
     )
 
     prompt = f"""

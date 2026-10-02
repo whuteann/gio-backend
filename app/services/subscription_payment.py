@@ -89,13 +89,16 @@ def checkout(db: Session, user: User, billing_cycle: str) -> SubscriptionPayment
         existing.status = "FAILED"
 
     reference_no = f"GIO-SUB-{uuid.uuid4()}"
-    description = f"Gio Premium — {billing_cycle.title()} subscription"
+    description = f"Auren Premium — {billing_cycle.title()} subscription"
 
     invoice = xendit_client.create_invoice(
         external_id=reference_no,
         amount=float(amount),
         currency=currency,
-        payer_email=user.email,
+        # Xendit requires an email; email is optional on User now that
+        # phone_number is the login identity (app/models/user.py) — synthesize
+        # one rather than fail checkout for a user who never gave an email.
+        payer_email=user.email or f"{user.phone_number}@noemail.giobyquartzic.com",
         payer_name=user.display_name,
         description=description,
         success_redirect_url=settings.xendit_success_redirect_url,

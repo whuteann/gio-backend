@@ -15,19 +15,22 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
-    existing = db.query(User).filter(User.email == payload.email.lower().strip()).first()
+    existing = db.query(User).filter(User.phone_number == payload.phone_number.strip()).first()
     if existing:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An account with this email already exists.")
-    user = create_user(db, email=payload.email, password=payload.password, display_name=payload.display_name, language=payload.language)
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An account with this phone number already exists.")
+    user = create_user(
+        db, phone_number=payload.phone_number, password=payload.password,
+        display_name=payload.display_name, language=payload.language, email=payload.email,
+    )
     db.commit()
     return TokenResponse(access_token=create_access_token(str(user.id)), refresh_token=create_refresh_token(str(user.id)))
 
 
 @router.post("/login", response_model=TokenResponse)
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.email == payload.email.lower().strip()).first()
+    user = db.query(User).filter(User.phone_number == payload.phone_number.strip()).first()
     if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password.")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid phone number or password.")
     user.last_login_at = datetime.now(timezone.utc)
     db.commit()
     return TokenResponse(access_token=create_access_token(str(user.id)), refresh_token=create_refresh_token(str(user.id)))

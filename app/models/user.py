@@ -12,7 +12,13 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email = Column(String, unique=True, nullable=False, index=True)
+    # The login identity — a plain string of digits, no formatting (no "+",
+    # spaces or dashes); the frontend is responsible for any country-code UX.
+    phone_number = Column(String, unique=True, nullable=False, index=True)
+    # No longer the login identity (phone_number is) — kept, now optional,
+    # purely for Xendit checkout/invoicing (app/services/subscription_payment.py,
+    # app/services/invoice.py both fall back to phone_number when this is null).
+    email = Column(String, unique=True, nullable=True, index=True)
     password_hash = Column(String, nullable=False)
     display_name = Column(String, nullable=False)
     gid = Column(String, unique=True, nullable=False)

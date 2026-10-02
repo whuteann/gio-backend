@@ -20,7 +20,8 @@ class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    email: str
+    phone_number: str
+    email: str | None
     display_name: str
     gid: str
     status: str

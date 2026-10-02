@@ -14,7 +14,7 @@ from app.api.v1.router import api_router
 from app.config import settings
 from app.dependencies import get_db
 
-app = FastAPI(title="Gio Backend", version="0.1.0")
+app = FastAPI(title="Auren Backend", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,

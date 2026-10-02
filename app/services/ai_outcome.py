@@ -34,7 +34,7 @@ from app.services.content import AFFIRMATIONS, INSIGHT_IDS_BY_FOCUS, INSIGHTS, R
 _client = AsyncOpenAI(api_key=settings.openai_api_key)
 
 _SYSTEM_MESSAGE = (
-    "You are a warm, perceptive wellness companion writing for an app called Gio. "
+    "You are a warm, perceptive wellness companion writing for an app called Auren. "
     "You must strictly follow the required JSON structure."
 )
 

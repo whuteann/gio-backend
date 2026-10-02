@@ -122,7 +122,7 @@ def generate_invoice_pdf(payment: SubscriptionPayment, user: User) -> bytes:
     # --- Bill-to / invoice meta / status row, below the letterhead. ---
     meta_row = Table(
         [[
-            Paragraph(f"BILL TO<br/><br/>{user.display_name}<br/>{user.email}", label_style),
+            Paragraph(f"BILL TO<br/><br/>{user.display_name}<br/>{user.email or user.phone_number}", label_style),
             Paragraph(f"INVOICE<br/>No. {invoice_number}<br/>{invoice_date}", invoice_meta_style),
             Paragraph(
                 f"STATUS<br/><br/><font color='{'#33452f' if payment.status == 'COMPLETED' else '#b9902a'}'>{_status_label(payment)}</font>",

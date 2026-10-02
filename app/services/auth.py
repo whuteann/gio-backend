@@ -17,11 +17,12 @@ def generate_gid() -> str:
     return f"GIO-{_gid_chunk()}-{_gid_chunk()}"
 
 
-def create_user(db: Session, *, email: str, password: str, display_name: str, language: str) -> User:
+def create_user(db: Session, *, phone_number: str, password: str, display_name: str, language: str, email: str | None = None) -> User:
     now = datetime.now(timezone.utc)
     user = User(
         id=uuid.uuid4(),
-        email=email.lower().strip(),
+        phone_number=phone_number.strip(),
+        email=email.lower().strip() if email else None,
         password_hash=hash_password(password),
         display_name=display_name,
         gid=generate_gid(),

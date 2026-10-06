@@ -27,9 +27,25 @@ class Settings(BaseSettings):
     # never flip this in a real production environment.
     payment_gateway_enabled: bool = True
     # Comma-separated origins allowed to call this API from a browser (the
-    # Next.js dev server by default). gio-member-app is the only consumer
-    # today, so this is intentionally narrow rather than "*".
+    # Next.js dev server by default). Now also called directly by
+    # bracelet-website (Gio<->Auren account linking) and bangle-bazi-admin
+    # (Auren accounts listing) — see AUREN_GIO_ACCOUNT_LINKING_PLAN.md.
     cors_origins: str = "http://localhost:3000"
+
+    # Shared secret with braceletBackend, used only to sign/verify the
+    # short-lived Gio<->Auren account-linking tokens (see
+    # app/core/link_token.py) and to gate the one true server-to-server
+    # call left (the Auren-signup sync webhook) and the admin listing
+    # endpoint. Never used for normal user sessions. Placeholder below
+    # MUST be replaced with a real generated secret (kept identical on
+    # braceletBackend) before any non-local deploy.
+    internal_link_secret: str = "dev-only-insecure-placeholder-change-before-prod"
+
+    # braceletBackend's base URL, for the outbound Auren-signup sync call.
+    # NOT localhost — this process's own "localhost" is itself inside the
+    # container. host.docker.internal is Docker Desktop's route to the
+    # host machine; .env overrides this for other setups.
+    bracelet_backend_url: str = "http://host.docker.internal:8000"
 
     @property
     def cors_origin_list(self) -> list[str]:

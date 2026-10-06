@@ -1,7 +1,7 @@
 import uuid
 
 from sqlalchemy import CheckConstraint, Column, Date, DateTime, ForeignKey, Numeric, SmallInteger, String, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
@@ -30,6 +30,17 @@ class RecommendationProfile(Base):
     # a DB table, so this stores the key and the response layer resolves the
     # swatch/name/etc. from that constant.
     colour_key = Column(String, nullable=False)
+    # The deterministic stone-type pick (Crystal | Nephrite | Jade) —
+    # app/services/content.py::FOCUS_TO_MATERIAL — used both as the
+    # vendor-fetch `type=` filter and as the "Material Affinity" key-info
+    # shown on the recommendation detail page.
+    material_affinity = Column(String, nullable=True)
+    # The one unifying bilingual "letter" tying focus pillar + colour +
+    # material + picks together — app/services/ai_recommendation.py.
+    # Nullable: pre-dates this column, and best-effort like the rest of the
+    # AI half (a vendor/AI failure must not block the reflection submit).
+    letter_en = Column(String, nullable=True)
+    letter_zh = Column(String, nullable=True)
     status = Column(String, nullable=False, default="READY")
     generated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
 
@@ -66,3 +77,8 @@ class RecommendationItem(Base):
     # (app/services/ai_recommendation.py). Language-neutral (English only),
     # like the other PRODUCT-specific fields here.
     material_tag = Column(String, nullable=True)
+    # The vendor's own `specifications` blob, cleaned and already zh/en
+    # split — app/services/product_api.py::parse_specifications(). A JSON
+    # array of {label_en, label_zh, value_en, value_zh}, e.g. Materials/
+    # Certification/Inner Diameter. Null/empty when the vendor gave none.
+    specifications = Column(JSONB, nullable=True)

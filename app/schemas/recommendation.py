@@ -4,6 +4,13 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict
 
 
+class SpecificationOut(BaseModel):
+    label_en: str
+    label_zh: str
+    value_en: str
+    value_zh: str
+
+
 class RecommendationItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -19,6 +26,7 @@ class RecommendationItemOut(BaseModel):
     currency: str
     destination_url: str | None
     material_tag: str | None
+    specifications: list[SpecificationOut] | None
 
 
 class RecommendationOut(BaseModel):
@@ -31,6 +39,15 @@ class RecommendationOut(BaseModel):
     colour_name: str
     colour_name_zh: str
     colour_swatch: str
+    # The deterministic stone-type pick (Crystal | Nephrite | Jade) —
+    # app/services/content.py::FOCUS_TO_MATERIAL. Null on profiles
+    # generated before this column existed.
+    material_affinity: str | None
+    # The one unifying bilingual letter the AI half writes — null on
+    # profiles generated before this existed, or where the AI/vendor step
+    # failed (best-effort, same as items being empty).
+    letter_en: str | None
+    letter_zh: str | None
     status: str
     generated_at: datetime
     items: list[RecommendationItemOut]

@@ -8,6 +8,7 @@ from app.core.security import create_access_token, create_refresh_token, decode_
 from app.dependencies import get_db
 from app.models.user import User
 from app.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, TokenResponse
+from app.services.account_link import notify_bracelet_backend_of_signup
 from app.services.auth import create_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -23,6 +24,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
         display_name=payload.display_name, language=payload.language, email=payload.email,
     )
     db.commit()
+    notify_bracelet_backend_of_signup(user)
     return TokenResponse(access_token=create_access_token(str(user.id)), refresh_token=create_refresh_token(str(user.id)))
 
 

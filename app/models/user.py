@@ -44,6 +44,13 @@ class User(Base):
     last_inner_reading_at = Column(DateTime(timezone=True), nullable=True)
     inner_reading_count_today = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # Gio<->Auren account linking (see AUREN_GIO_ACCOUNT_LINKING_PLAN.md).
+    # braceletBackend holds the other half of this relationship as
+    # auren_account_links.bracelet_user_id/auren_user_id — this column is
+    # the Auren-side mirror of the same link, kept in sync by the
+    # /account-link/confirm and /account-link/unlink endpoints.
+    linked_bracelet_user_id = Column(UUID(as_uuid=True), unique=True, nullable=True)
+    linked_at = Column(DateTime(timezone=True), nullable=True)
 
     subscription = relationship("Subscription", back_populates="user", uselist=False, cascade="all, delete-orphan")
     core_personality = relationship("CorePersonality", back_populates="user", uselist=False, cascade="all, delete-orphan")

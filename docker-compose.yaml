@@ -12,6 +12,8 @@ services:
       - CORS_ORIGINS=${CORS_ORIGINS}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_MODEL=${OPENAI_MODEL}
+      - INTERNAL_LINK_SECRET=${INTERNAL_LINK_SECRET}
+      - BRACELET_BACKEND_URL=${BRACELET_BACKEND_URL}
     depends_on:
       db:
         condition: service_healthy

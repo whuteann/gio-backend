@@ -80,3 +80,19 @@ class AdminUserListResponse(BaseModel):
     total: int
     page: int
     page_size: int
+
+
+class SignInWithGioRequest(BaseModel):
+    verify_gio_token: str
+    display_name: str
+    # Plaintext — used only to seed a brand-new account's password_hash on
+    # first "Sign in with Gio" (see AUREN_SIGN_IN_WITH_GIO_PLAN.md §3a).
+    # Ignored entirely on the returning-user path.
+    password: str
+
+
+class SignInWithGioResponse(BaseModel):
+    is_new: bool
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"

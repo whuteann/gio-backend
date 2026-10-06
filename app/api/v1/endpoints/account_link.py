@@ -31,12 +31,15 @@ from app.schemas.account_link import (
     HandoffResponse,
     IssueAssertionResponse,
     LinkStatusResponse,
+    SignInWithGioRequest,
+    SignInWithGioResponse,
     SsoExchangeRequest,
     UnlinkRequest,
     UnlinkResponse,
 )
 from app.schemas.auth import TokenResponse
-from app.services.account_link import strip_phone_number
+from app.services.account_link import link_from_signup, strip_phone_number
+from app.services.auth import create_user
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +129,61 @@ def confirm(payload: ConfirmRequest, db: Session = Depends(get_db)):
         db.commit()
 
     return ConfirmResponse(linked=True)
+
+
+@router.post("/sign-in-with-gio", response_model=SignInWithGioResponse)
+def sign_in_with_gio(payload: SignInWithGioRequest, db: Session = Depends(get_db)):
+    """Social-login-style provisioning entry point — see
+    AUREN_SIGN_IN_WITH_GIO_PLAN.md. Takes no existing Auren session (there
+    may be no Auren account yet); identity proof is entirely the
+    verify_gio_token, minted by braceletBackend's own /authenticate after a
+    real Gio password check.
+    """
+    claims = verify_link_token(payload.verify_gio_token, PURPOSE_VERIFY_GIO)
+    bracelet_user_id = UUID(claims["bracelet_user_id"])
+    phone_no = claims.get("phone_no", "")
+
+    existing = db.query(User).filter(User.linked_bracelet_user_id == bracelet_user_id).first()
+    if existing:
+        # Returning user — the submitted password is deliberately never
+        # touched here, only used to seed a brand-new account (§3a).
+        existing.last_login_at = datetime.now(timezone.utc)
+        db.commit()
+        return SignInWithGioResponse(
+            is_new=False,
+            access_token=create_access_token(str(existing.id)),
+            refresh_token=create_refresh_token(str(existing.id)),
+        )
+
+    phone = strip_phone_number(phone_no)
+    if db.query(User).filter(User.phone_number == phone).first():
+        # An Auren account already exists for this phone number but isn't
+        # linked to this Gio account — surface clearly rather than letting
+        # create_user()'s own unique constraint throw an unhandled 500.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An Auren account already exists for this phone number but isn't linked to this Gio account.",
+        )
+
+    user = create_user(
+        db,
+        phone_number=phone,
+        password=payload.password,
+        display_name=payload.display_name,
+        language="en",
+    )
+    user.linked_bracelet_user_id = bracelet_user_id
+    user.linked_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(user)
+
+    link_from_signup(bracelet_user_id, user.id, phone)
+
+    return SignInWithGioResponse(
+        is_new=True,
+        access_token=create_access_token(str(user.id)),
+        refresh_token=create_refresh_token(str(user.id)),
+    )
 
 
 @router.post("/unlink", response_model=UnlinkResponse)

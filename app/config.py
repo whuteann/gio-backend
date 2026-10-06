@@ -41,11 +41,13 @@ class Settings(BaseSettings):
     # braceletBackend) before any non-local deploy.
     internal_link_secret: str = "dev-only-insecure-placeholder-change-before-prod"
 
-    # braceletBackend's base URL, for the outbound Auren-signup sync call.
-    # NOT localhost — this process's own "localhost" is itself inside the
+    # braceletBackend's base URL (including /api/v1 — call sites append only
+    # the route-specific path beyond that, e.g. "/internal/auren/sync-user"),
+    # for the outbound Auren-signup sync and link-from-signup calls. NOT
+    # localhost — this process's own "localhost" is itself inside the
     # container. host.docker.internal is Docker Desktop's route to the
     # host machine; .env overrides this for other setups.
-    bracelet_backend_url: str = "http://host.docker.internal:8000"
+    bracelet_backend_url: str = "http://host.docker.internal:8000/api/v1"
 
     @property
     def cors_origin_list(self) -> list[str]:

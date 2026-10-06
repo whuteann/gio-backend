@@ -7,6 +7,7 @@ from app.api.v1.endpoints import (
     colours,
     core_personality,
     journal,
+    lumenart,
     me,
     onboarding,
     personality,
@@ -34,3 +35,4 @@ api_router.include_router(journal.router)
 api_router.include_router(subscription.router)
 api_router.include_router(colours.router)
 api_router.include_router(account_link.router)
+api_router.include_router(lumenart.router)

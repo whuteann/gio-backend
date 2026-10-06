@@ -49,6 +49,14 @@ class Settings(BaseSettings):
     # host machine; .env overrides this for other setups.
     bracelet_backend_url: str = "http://host.docker.internal:8000/api/v1"
 
+    # LumenArt (Shopify) phone-case catalog — see
+    # GioMembershipPlatform/LumenArt-APi Integration.md and
+    # app/services/lumenart.py. client_secret is a real credential: only
+    # ever lives here, never in frontend code or source control.
+    lumenart_shop_domain: str = "fmt0ej-1m.myshopify.com"
+    lumenart_client_id: str = "f4419f5d1f511b2a69aa6b7e152dfc8f"
+    lumenart_client_secret: str = ""
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

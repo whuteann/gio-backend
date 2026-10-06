@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
+    account_link,
     auth,
     checkins,
     colours,
@@ -32,3 +33,4 @@ api_router.include_router(rewards.router)
 api_router.include_router(journal.router)
 api_router.include_router(subscription.router)
 api_router.include_router(colours.router)
+api_router.include_router(account_link.router)

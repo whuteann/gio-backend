@@ -36,11 +36,12 @@ from sqlalchemy.orm import Session
 from app.models.recommendation import RecommendationItem, RecommendationProfile
 from app.models.reflection import InnerStateSnapshot
 from app.models.user import User
-from app.services.ai_recommendation import pick_products
-from app.services.content import COLOURS, FOCUS_COPY, FOCUS_TO_COLOUR
+from app.services.ai_recommendation import generate_recommendation
+from app.services.content import COLOURS, FOCUS_COPY, FOCUS_TO_COLOUR, FOCUS_TO_MATERIAL
 from app.services.gamification import today_utc
 from app.services.narrative_prompt import build_narrative_prompt
-from app.services.product_api import fetch_products_by_colour
+from app.services.phonecase_api import fetch_phone_cases
+from app.services.product_api import fetch_products, parse_specifications
 
 logger = logging.getLogger(__name__)
 
@@ -54,34 +55,81 @@ def _parse_price(raw: str | None) -> Decimal | None:
         return None
 
 
-async def _fetch_and_pick(colour_key: str, narrative_prompt: str, limit: int) -> list[dict]:
-    candidates = await fetch_products_by_colour(colour_key)
-    return await pick_products(narrative_prompt=narrative_prompt, candidates=candidates, limit=limit)
+async def _fetch_and_pick(*, colour_key: str, material_affinity: str, focus_label: str, narrative_prompt: str, limit: int) -> dict:
+    stone_candidates, phone_case_candidates = await asyncio.gather(
+        fetch_products(colour_key, stone_type=material_affinity),
+        fetch_phone_cases(),
+    )
+    return await generate_recommendation(
+        narrative_prompt=narrative_prompt, focus_label=focus_label, material_affinity=material_affinity,
+        stone_candidates=stone_candidates, phone_case_candidates=phone_case_candidates, limit=limit,
+    )
 
 
-def _refresh_product_items(profile: RecommendationProfile, *, colour_key: str, narrative_prompt: str, limit: int, next_rank: int) -> None:
+def _product_item(product: dict, *, rank: int) -> RecommendationItem:
+    product_id = product.get("id")
+    return RecommendationItem(
+        type="PRODUCT", reference_id=str(product_id) if product_id else None,
+        title=product.get("name") or "Recommended piece", title_zh=product.get("name"),
+        reason=product["reason_en"], reason_zh=product["reason_zh"],
+        rank=rank,
+        image_url=product.get("primary_image"),
+        price=_parse_price(product.get("price")),
+        currency=product.get("currency") or "MYR",
+        destination_url=f"https://www.giobyquartzic.com/products/{product_id}" if product_id else None,
+        material_tag=product.get("material_tag"),
+        specifications=parse_specifications(product.get("specifications")) or None,
+    )
+
+
+def _phone_case_item(product: dict, *, rank: int) -> RecommendationItem:
+    product_id = product.get("id")
+    return RecommendationItem(
+        type="PHONE_CASE", reference_id=str(product_id) if product_id else None,
+        title=product.get("name") or "Recommended piece", title_zh=product.get("name"),
+        reason=product["reason_en"], reason_zh=product["reason_zh"],
+        rank=rank,
+        image_url=product.get("primary_image"),
+        price=_parse_price(product.get("price")),
+        currency=product.get("currency") or "MYR",
+        destination_url=f"https://www.giobyquartzic.com/products/{product_id}" if product_id else None,
+        specifications=parse_specifications(product.get("specifications")) or None,
+    )
+
+
+def _refresh_product_items(
+    profile: RecommendationProfile, *, colour_key: str, material_affinity: str, focus_label: str,
+    narrative_prompt: str, limit: int, next_rank: int,
+) -> None:
     """Best-effort: any failure here (vendor API down, AI call failing)
-    leaves the profile with no PRODUCT items rather than failing the
-    submission that triggered it — see module docstring."""
+    leaves the profile with no PRODUCT/PHONE_CASE items and no letter
+    rather than failing the submission that triggered it — see module
+    docstring."""
     try:
-        picks = asyncio.run(_fetch_and_pick(colour_key, narrative_prompt, limit))
-    except Exception:
-        logger.exception("Product fetch/pick failed for recommendation %s (colour=%s) — no PRODUCT items this run.", profile.id, colour_key)
-        picks = []
-
-    for i, product in enumerate(picks):
-        product_id = product.get("id")
-        profile.items.append(RecommendationItem(
-            type="PRODUCT", reference_id=str(product_id) if product_id else None,
-            title=product.get("name") or "Recommended piece", title_zh=product.get("name"),
-            reason=product["reason_en"], reason_zh=product["reason_zh"],
-            rank=next_rank + i,
-            image_url=product.get("primary_image"),
-            price=_parse_price(product.get("price")),
-            currency=product.get("currency") or "MYR",
-            destination_url=f"https://www.giobyquartzic.com/products/{product_id}" if product_id else None,
-            material_tag=product.get("material_tag"),
+        result = asyncio.run(_fetch_and_pick(
+            colour_key=colour_key, material_affinity=material_affinity, focus_label=focus_label,
+            narrative_prompt=narrative_prompt, limit=limit,
         ))
+    except Exception:
+        logger.exception(
+            "Recommendation fetch/pick failed for recommendation %s (colour=%s, material=%s) — no PRODUCT/PHONE_CASE items this run.",
+            profile.id, colour_key, material_affinity,
+        )
+        result = {"letter_en": "", "letter_zh": "", "feature": None, "others": [], "phone_case": []}
+
+    profile.letter_en = result["letter_en"] or None
+    profile.letter_zh = result["letter_zh"] or None
+
+    rank = next_rank
+    if result["feature"]:
+        profile.items.append(_product_item(result["feature"], rank=rank))
+        rank += 1
+    for product in result["others"]:
+        profile.items.append(_product_item(product, rank=rank))
+        rank += 1
+    for product in result["phone_case"]:
+        profile.items.append(_phone_case_item(product, rank=rank))
+        rank += 1
 
 
 def build_recommendation(
@@ -101,6 +149,7 @@ def build_recommendation(
     focus_label = focus_copy["focus"]
     profile_data = FOCUS_TO_COLOUR.get(focus_label, FOCUS_TO_COLOUR["Sustaining balance"])
     colour = COLOURS[profile_data["colour_key"]]
+    material_affinity = FOCUS_TO_MATERIAL.get(focus_label, FOCUS_TO_MATERIAL["Sustaining balance"])
     title_for_reason = personality_title or "you"
     today = today_utc()
     limit = 3 if is_premium else 1
@@ -118,6 +167,7 @@ def build_recommendation(
         existing.summary = focus_copy["summary"]
         existing.summary_zh = focus_copy["summary_zh"]
         existing.colour_key = colour["key"]
+        existing.material_affinity = material_affinity
         existing.generated_at = datetime.now(timezone.utc)
         for item in [i for i in existing.items if i.type in ("COLOUR", "ROUTINE")]:
             existing.items.remove(item)
@@ -145,7 +195,10 @@ def build_recommendation(
         # rest of the day just because *a* profile row exists for today.
         if not any(i.type == "PRODUCT" for i in existing.items):
             narrative_prompt = build_narrative_prompt(db, user, snapshot=snapshot, focus_label=focus_label, colour=colour)
-            _refresh_product_items(existing, colour_key=colour["key"], narrative_prompt=narrative_prompt, limit=limit, next_rank=3)
+            _refresh_product_items(
+                existing, colour_key=colour["key"], material_affinity=material_affinity, focus_label=focus_label,
+                narrative_prompt=narrative_prompt, limit=limit, next_rank=3,
+            )
             db.flush()
         return existing
 
@@ -163,6 +216,7 @@ def build_recommendation(
         summary=focus_copy["summary"],
         summary_zh=focus_copy["summary_zh"],
         colour_key=colour["key"],
+        material_affinity=material_affinity,
         status="READY",
         generated_at=datetime.now(timezone.utc),
     )
@@ -186,7 +240,10 @@ def build_recommendation(
     db.flush()
 
     narrative_prompt = build_narrative_prompt(db, user, snapshot=snapshot, focus_label=focus_label, colour=colour)
-    _refresh_product_items(profile, colour_key=colour["key"], narrative_prompt=narrative_prompt, limit=limit, next_rank=3)
+    _refresh_product_items(
+        profile, colour_key=colour["key"], material_affinity=material_affinity, focus_label=focus_label,
+        narrative_prompt=narrative_prompt, limit=limit, next_rank=3,
+    )
 
     db.flush()
     return profile

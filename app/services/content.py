@@ -264,6 +264,22 @@ FOCUS_TO_COLOUR = {
     "Sustaining balance": {"colour_key": "gold", "tags": ["calm", "reflection"], "routine": "Keep doing what's working — a short reflection tonight will reinforce it.", "routine_zh": "继续做有效的事——今晚简短反思会强化它。"},
 }
 
+# Deterministic "material affinity" — same spirit as FOCUS_TO_COLOUR above
+# (flavour, not a real mineralogical claim): which of the vendor catalog's
+# 3 real stone types (confirmed against the live API — Crystal/Nephrite/
+# Jade are the *only* `type` values that exist in it) pairs with each
+# focus. Crystal for the two "activating" focuses, Jade for the two
+# "settling" ones, Nephrite for steady balance. Feeds the vendor fetch's
+# `type=` filter (app/services/product_api.py) and the "Material Affinity"
+# key-info on the recommendation detail page.
+FOCUS_TO_MATERIAL = {
+    "Rebuilding energy": "Crystal",
+    "Finding clarity": "Crystal",
+    "Releasing pressure": "Jade",
+    "Regaining grounding": "Jade",
+    "Sustaining balance": "Nephrite",
+}
+
 BADGE_DEFINITIONS = [
     {"key": "three_day_streak", "group": "consistency", "title": "Three Days Steady", "description": "Reflected three days in a row.", "icon": "🌤️"},
     {"key": "two_week_rhythm", "group": "consistency", "title": "Two-Week Rhythm", "description": "Kept a 14-day reflection streak.", "icon": "🕰️"},

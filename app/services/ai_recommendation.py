@@ -65,7 +65,9 @@ def _build_schema(stone_keys: list[str], case_keys: list[str]) -> type[BaseModel
     # Only ask for phone case picks when there's actually something to pick
     # from — building an Enum from an empty mapping raises, and there's
     # nothing meaningful to constrain-select from zero candidates anyway
-    # (see phonecase_api.py — a placeholder, routinely empty today).
+    # (see app/services/lumenart.py — empty only if the cache has never
+    # successfully populated, e.g. a brand-new deploy before the first
+    # lazy refresh succeeds).
     if case_keys:
         CaseKey = Enum("CaseKey", {k: k for k in case_keys})
         CasePick = create_model(
@@ -111,9 +113,11 @@ Here are the current phone case candidates (a separate, unrelated product \
 line — not stones, don't connect them to the material affinity above):
 {case_list}
 
-Pick at least 1 of these too in `phone_case_picks` — never zero, there is \
-always at least one worth recommending. For each, `reason_en`/`reason_zh`: \
-1-2 sentences, same letter voice as above, brief."""
+Pick exactly 1 of these in `phone_case_picks` — never zero, there is \
+always at least one worth recommending, and never more than one. \
+`reason_en`/`reason_zh`: 1-2 sentences, same letter voice as above, brief \
+— this is its own small gift, not a stone, so don't force a tie to the \
+material affinity above."""
 
     prompt = f"""\
 {narrative_prompt}
@@ -180,14 +184,12 @@ fragment or a summary of the picks above.
     phone_case: list[dict] = []
     picks_attr = getattr(parsed, "phone_case_picks", None)
     if case_keyed and picks_attr:
-        seen_cases: set[str] = set()
-        for pick in picks_attr:
-            key = pick.case_key.value
-            if key in seen_cases:
-                continue
-            seen_cases.add(key)
-            product = case_keyed[key]
-            phone_case.append({**product, "reason_en": pick.reason_en, "reason_zh": pick.reason_zh})
+        # Capped at exactly 1 regardless of what the model actually
+        # returns — the prompt says "exactly 1" but structured output
+        # gives no hard guarantee of that count either way.
+        pick = picks_attr[0]
+        product = case_keyed[pick.case_key.value]
+        phone_case.append({**product, "reason_en": pick.reason_en, "reason_zh": pick.reason_zh})
 
     return {
         "letter_en": parsed.letter_en,

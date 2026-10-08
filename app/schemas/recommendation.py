@@ -26,6 +26,7 @@ class RecommendationItemOut(BaseModel):
     currency: str
     destination_url: str | None
     material_tag: str | None
+    category: str | None
     specifications: list[SpecificationOut] | None
 
 

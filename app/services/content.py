@@ -280,6 +280,11 @@ FOCUS_TO_MATERIAL = {
     "Sustaining balance": "Nephrite",
 }
 
+# The 3 real stone types, full stop — single source of truth so nothing
+# else has to hardcode this list (e.g. fetching/picking one product per
+# type for a recommendation's product set).
+STONE_TYPES = ("Crystal", "Nephrite", "Jade")
+
 BADGE_DEFINITIONS = [
     {"key": "three_day_streak", "group": "consistency", "title": "Three Days Steady", "description": "Reflected three days in a row.", "icon": "🌤️"},
     {"key": "two_week_rhythm", "group": "consistency", "title": "Two-Week Rhythm", "description": "Kept a 14-day reflection streak.", "icon": "🕰️"},

@@ -27,7 +27,6 @@ from app.models.gamification import UserBadge
 from app.models.reflection import InnerReading, InnerStateSnapshot
 from app.models.user import User
 from app.services import gamification as gam
-from app.services.entitlement import is_premium_active
 from app.services.recommendation import build_recommendation
 from app.services.scoring import resolve_focus_key
 
@@ -119,7 +118,6 @@ def apply_reflection_side_effects(
         db, user=user, snapshot=snapshot, core_personality_id=core_personality_id,
         focus_key=focus_key, personality_title=personality_title,
         trigger_type=source_type, trigger_check_in_session_id=check_in_session_id, trigger_inner_reading_id=inner_reading_id,
-        is_premium=is_premium_active(user.subscription),
     )
     snapshot.colour_key = recommendation.colour_key
 

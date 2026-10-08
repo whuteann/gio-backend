@@ -37,7 +37,7 @@ from app.models.recommendation import RecommendationItem, RecommendationProfile
 from app.models.reflection import InnerStateSnapshot
 from app.models.user import User
 from app.services.ai_recommendation import generate_recommendation
-from app.services.content import COLOURS, FOCUS_COPY, FOCUS_TO_COLOUR, FOCUS_TO_MATERIAL
+from app.services.content import COLOURS, FOCUS_COPY, FOCUS_TO_COLOUR, FOCUS_TO_MATERIAL, STONE_TYPES
 from app.services.gamification import today_utc
 from app.services.lumenart import get_phone_case_candidates
 from app.services.narrative_prompt import build_narrative_prompt
@@ -56,16 +56,20 @@ def _parse_price(raw: str | None) -> Decimal | None:
 
 
 async def _fetch_and_pick(
-    *, db: Session, colour_key: str, material_affinity: str, focus_label: str, narrative_prompt: str, limit: int
+    *, db: Session, colour_key: str, material_affinity: str, focus_label: str, narrative_prompt: str
 ) -> dict:
     # Phone case candidates come from a sync, DB-backed lazy cache (see
     # lumenart.py) rather than a live vendor call, so there's nothing to
-    # actually gather concurrently with the stone fetch here.
+    # actually gather concurrently with the stone fetch here. All 3 stone
+    # types are fetched (same colour, different `type=`) so the product
+    # set can carry one pick per type rather than 3 from whichever single
+    # type the focus happened to match.
     phone_case_candidates = get_phone_case_candidates(db)
-    stone_candidates = await fetch_products(colour_key, stone_type=material_affinity)
+    type_results = await asyncio.gather(*(fetch_products(colour_key, stone_type=t) for t in STONE_TYPES))
+    stone_candidates_by_type = dict(zip(STONE_TYPES, type_results))
     return await generate_recommendation(
         narrative_prompt=narrative_prompt, focus_label=focus_label, material_affinity=material_affinity,
-        stone_candidates=stone_candidates, phone_case_candidates=phone_case_candidates, limit=limit,
+        stone_candidates_by_type=stone_candidates_by_type, phone_case_candidates=phone_case_candidates,
     )
 
 
@@ -81,6 +85,7 @@ def _product_item(product: dict, *, rank: int) -> RecommendationItem:
         currency=product.get("currency") or "MYR",
         destination_url=f"https://www.giobyquartzic.com/products/{product_id}" if product_id else None,
         material_tag=product.get("material_tag"),
+        category=product.get("stone_type"),
         specifications=parse_specifications(product.get("specifications")) or None,
     )
 
@@ -106,7 +111,7 @@ def _phone_case_item(product: dict, *, rank: int) -> RecommendationItem:
 
 def _refresh_product_items(
     profile: RecommendationProfile, *, db: Session, colour_key: str, material_affinity: str, focus_label: str,
-    narrative_prompt: str, limit: int, next_rank: int,
+    narrative_prompt: str, next_rank: int,
 ) -> None:
     """Best-effort: any failure here (vendor API down, AI call failing)
     leaves the profile with no PRODUCT/PHONE_CASE items and no letter
@@ -115,7 +120,7 @@ def _refresh_product_items(
     try:
         result = asyncio.run(_fetch_and_pick(
             db=db, colour_key=colour_key, material_affinity=material_affinity, focus_label=focus_label,
-            narrative_prompt=narrative_prompt, limit=limit,
+            narrative_prompt=narrative_prompt,
         ))
     except Exception:
         logger.exception(
@@ -150,7 +155,6 @@ def build_recommendation(
     trigger_type: str,
     trigger_check_in_session_id: uuid.UUID | None,
     trigger_inner_reading_id: uuid.UUID | None,
-    is_premium: bool,
 ) -> RecommendationProfile:
     focus_copy = FOCUS_COPY[focus_key]
     focus_label = focus_copy["focus"]
@@ -159,7 +163,6 @@ def build_recommendation(
     material_affinity = FOCUS_TO_MATERIAL.get(focus_label, FOCUS_TO_MATERIAL["Sustaining balance"])
     title_for_reason = personality_title or "you"
     today = today_utc()
-    limit = 3 if is_premium else 1
 
     existing = db.query(RecommendationProfile).filter_by(user_id=user.id, recommendation_date=today).first()
 
@@ -204,7 +207,7 @@ def build_recommendation(
             narrative_prompt = build_narrative_prompt(db, user, snapshot=snapshot, focus_label=focus_label, colour=colour)
             _refresh_product_items(
                 existing, db=db, colour_key=colour["key"], material_affinity=material_affinity, focus_label=focus_label,
-                narrative_prompt=narrative_prompt, limit=limit, next_rank=3,
+                narrative_prompt=narrative_prompt, next_rank=3,
             )
             db.flush()
         return existing
@@ -249,7 +252,7 @@ def build_recommendation(
     narrative_prompt = build_narrative_prompt(db, user, snapshot=snapshot, focus_label=focus_label, colour=colour)
     _refresh_product_items(
         profile, db=db, colour_key=colour["key"], material_affinity=material_affinity, focus_label=focus_label,
-        narrative_prompt=narrative_prompt, limit=limit, next_rank=3,
+        narrative_prompt=narrative_prompt, next_rank=3,
     )
 
     db.flush()

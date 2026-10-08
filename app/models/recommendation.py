@@ -77,6 +77,12 @@ class RecommendationItem(Base):
     # (app/services/ai_recommendation.py). Language-neutral (English only),
     # like the other PRODUCT-specific fields here.
     material_tag = Column(String, nullable=True)
+    # PRODUCT items only — the deterministic stone type this item was
+    # drawn from (Crystal | Nephrite | Jade), set in code from which
+    # vendor-fetch pool produced the pick, never AI-authored (see
+    # app/services/ai_recommendation.py). Distinct from `material_tag`,
+    # which is the AI's specific-stone display name (e.g. "Moss Agate").
+    category = Column(String, nullable=True)
     # The vendor's own `specifications` blob, cleaned and already zh/en
     # split — app/services/product_api.py::parse_specifications(). A JSON
     # array of {label_en, label_zh, value_en, value_zh}, e.g. Materials/

@@ -4,3 +4,6 @@ __pycache__/
 venv/
 .env
 *.log
+
+# scripts/create_account.py --replace writes pre-delete account snapshots here
+.deleted-accounts/

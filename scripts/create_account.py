@@ -38,17 +38,21 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import os
 import socket
 import sys
 import uuid
 from datetime import date, datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 
 # Allow `python scripts/create_account.py` from the repo root as well as
 # from inside scripts/ — the container's WORKDIR is /app, but don't depend
 # on the caller's cwd for something this easy to make robust.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from sqlalchemy import text  # noqa: E402
 
 import app.models  # noqa: F401,E402 — register every mapper before first use (see app/main.py)
 from app.config import settings  # noqa: E402
@@ -104,6 +108,10 @@ def parse_args() -> argparse.Namespace:
                    help="Primary language of the account (default: en). Both languages are generated either way.")
     p.add_argument("--with-tokens", action="store_true",
                    help="Also print a ready-to-use access/refresh token pair for curl.")
+    p.add_argument("--replace", action="store_true",
+                   help="If the phone number already exists, delete that account and all its data, then "
+                        "create the new one — without asking. Needed when stdin is not a terminal "
+                        "(e.g. `docker compose exec -T`). Interactively, the script asks instead.")
     p.add_argument("--notify-bracelet", action="store_true",
                    help="Fire the braceletBackend signup-sync webhook, as POST /auth/register does. "
                         "Off by default: against production this writes a mirror row into braceletBackend's live database.")
@@ -186,6 +194,149 @@ def detect_production() -> str | None:
         return None
     finally:
         sock.close()
+
+
+# --------------------------------------------------------------------------
+# replacing an existing account
+# --------------------------------------------------------------------------
+
+# Repo root, not a hardcoded /app: resolves to /app/.deleted-accounts inside
+# the container and to the checkout when run anywhere else.
+SNAPSHOT_DIR = Path(__file__).resolve().parent.parent / ".deleted-accounts"
+
+# Which tables hang off a user is read from the database rather than listed
+# here, so this can't fall behind a migration that adds another one.
+_CHILD_TABLES_SQL = text("""
+    select distinct tc.table_name
+      from information_schema.table_constraints tc
+      join information_schema.constraint_column_usage ccu
+        on tc.constraint_name = ccu.constraint_name
+     where tc.constraint_type = 'FOREIGN KEY'
+       and ccu.table_name = 'users'
+       and ccu.column_name = 'id'
+     order by tc.table_name
+""")
+
+
+def _row_to_dict(obj) -> dict:
+    return {c.name: getattr(obj, c.name) for c in obj.__table__.columns}
+
+
+def _json_default(value):
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    if isinstance(value, (uuid.UUID, Decimal)):
+        return str(value)
+    return repr(value)
+
+
+def account_data_counts(db, user_id: uuid.UUID) -> dict[str, int]:
+    """Non-empty row counts per child table, so the confirmation prompt can
+    say what is actually about to be destroyed rather than just "a user"."""
+    counts = {}
+    for (table,) in db.execute(_CHILD_TABLES_SQL).fetchall():
+        n = db.execute(
+            text(f'select count(*) from "{table}" where user_id = :uid'), {"uid": str(user_id)}
+        ).scalar()
+        if n:
+            counts[table] = n
+    return counts
+
+
+def write_snapshot(db, user: User, counts: dict[str, int]) -> Path | None:
+    """Dump the account to a JSON file before deleting it. There are no
+    automatic database backups on this deployment (see
+    docs/deployment_runbook.md §7), so without this a replace is simply
+    unrecoverable. Includes the bcrypt password hash, which is what makes a
+    manual restore possible — hence 0600 and a directory outside git.
+    """
+    try:
+        SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "deleted_at": datetime.now(timezone.utc).isoformat(),
+            "reason": "replaced by scripts/create_account.py --replace",
+            "row_counts": counts,
+            "user": _row_to_dict(user),
+            "subscription": _row_to_dict(user.subscription) if user.subscription else None,
+            "core_personality": _row_to_dict(user.core_personality) if user.core_personality else None,
+            "payments": [
+                _row_to_dict(p)
+                for p in db.query(SubscriptionPayment).filter_by(user_id=user.id).all()
+            ],
+        }
+        path = SNAPSHOT_DIR / f"{user.phone_number}-{datetime.now(timezone.utc):%Y%m%dT%H%M%SZ}.json"
+        path.write_text(json.dumps(payload, indent=2, default=_json_default))
+        path.chmod(0o600)
+        return path
+    except OSError as e:
+        # A snapshot that can't be written must not silently become a
+        # delete with no backup — the caller surfaces this and stops.
+        print(f"  {_c('could not write snapshot:', RED)} {e}")
+        return None
+
+
+def describe_existing(user: User, counts: dict[str, int]) -> None:
+    sub = user.subscription
+    print()
+    print(_c("  THIS ACCOUNT ALREADY EXISTS", f"{BOLD}{YELLOW}"))
+    print(f"    Phone          : {user.phone_number}")
+    print(f"    Display name   : {user.display_name}")
+    print(f"    Gio ID         : {user.gid}")
+    print(f"    User ID        : {user.id}")
+    print(f"    Created        : {user.created_at:%Y-%m-%d %H:%M} UTC")
+    print(f"    Last login     : {f'{user.last_login_at:%Y-%m-%d %H:%M} UTC' if user.last_login_at else '(never)'}")
+    print(f"    Plan           : {sub.plan} / {sub.status}" if sub else "    Plan           : (none)")
+    if counts:
+        print(f"    Data           : {', '.join(f'{n} {t}' for t, n in counts.items())}")
+    else:
+        print(f"    Data           : {_c('none beyond the account row', DIM)}")
+    if user.linked_bracelet_user_id:
+        print()
+        print(f"    {_c('WARNING: this account is linked to a bracelet account', f'{BOLD}{RED}')}")
+        print(f"    {_c(f'bracelet_user_id = {user.linked_bracelet_user_id}', RED)}")
+        print(f"    {_c('That link row lives in braceletBackend\'s own database, which this', RED)}")
+        print(f"    {_c('script cannot touch. Deleting here orphans it there, and the new', RED)}")
+        print(f"    {_c('account will NOT inherit the link.', RED)}")
+
+
+def confirm_replace(user: User, counts: dict[str, int], pre_authorized: bool) -> None:
+    """Returns normally if the replace should go ahead; exits otherwise."""
+    describe_existing(user, counts)
+    print()
+
+    if pre_authorized:
+        print(f"  {_c('--replace given, deleting it.', YELLOW)}")
+        return
+
+    if not sys.stdin.isatty():
+        die("This phone number already exists and stdin is not a terminal, so there is\n"
+            "        no way to ask. Re-run with --replace to delete the account above and\n"
+            "        recreate it, or use a different --phone.")
+
+    print(f"  Replacing it {_c('permanently deletes', BOLD)} the account above and everything listed")
+    print("  on the Data line. This cannot be undone (a JSON snapshot is written first).")
+    print()
+    try:
+        answer = input("  Type 'replace' to confirm, or anything else to abort: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        die("Aborted — nothing was changed.")
+    if answer != "replace":
+        die(f"Got {answer!r}, not 'replace' — aborted, nothing was changed.")
+
+
+def replace_existing(db, user: User, counts: dict[str, int]) -> Path:
+    snapshot = write_snapshot(db, user, counts)
+    if snapshot is None:
+        die("Refusing to delete an account without a snapshot on disk.")
+    print(f"{_c('..', DIM)} snapshot written to {snapshot}")
+    # One DELETE; all 16 child tables cascade at the database level
+    # (verified against the live schema, including the NO ACTION
+    # core_personalities -> recommendation_profiles constraint, which is
+    # checked at end-of-statement and so does not block this).
+    db.delete(user)
+    db.flush()
+    print(f"{_c('..', DIM)} deleted the old account and its data")
+    return snapshot
 
 
 # --------------------------------------------------------------------------
@@ -273,13 +424,15 @@ def grant_premium(db, user: User, now: datetime) -> SubscriptionPayment:
 # output
 # --------------------------------------------------------------------------
 
-def print_result(args, user: User, personality: CorePersonality, premium: bool, tokens: tuple[str, str] | None) -> None:
+def print_result(args, user: User, personality: CorePersonality, premium: bool,
+                 tokens: tuple[str, str] | None, replaced: bool = False) -> None:
     sub = user.subscription
     rule = "=" * 68
+    headline = "account REPLACED and onboarded" if replaced else "account created and onboarded"
 
     print()
     print(_c(rule, GREEN))
-    print(_c(f"  SUCCESS — account created and onboarded", f"{BOLD}{GREEN}"))
+    print(_c(f"  SUCCESS — {headline}", f"{BOLD}{GREEN}"))
     print(_c(rule, GREEN))
     print()
     print(_c("  LOG IN WITH THESE CREDENTIALS", BOLD))
@@ -346,12 +499,22 @@ def main() -> None:
     if not settings.openai_api_key:
         die("OPENAI_API_KEY is empty — the Core Personality narrative cannot be generated.")
 
+    replaced = False
+    snapshot_path = None
+
     db = SessionLocal()
     try:
         phone = args.phone.strip()
-        if db.query(User).filter(User.phone_number == phone).first():
-            die(f"An account with phone number {phone} already exists "
-                f"(POST /auth/register would return 409 here).")
+        existing = db.query(User).filter(User.phone_number == phone).first()
+        if existing is not None:
+            counts = account_data_counts(db, existing.id)
+            confirm_replace(existing, counts, pre_authorized=args.replace)
+            snapshot_path = replace_existing(db, existing, counts)
+            replaced = True
+            # Not committed yet, deliberately. The delete and the new
+            # account are one transaction, so if the OpenAI call below
+            # fails the old account comes back rather than the phone
+            # number being left with no account at all.
 
         # 1. Signup, exactly as POST /auth/register does it.
         user = create_user(
@@ -406,13 +569,24 @@ def main() -> None:
             notify_bracelet_backend_of_signup(user)
 
         # Last, so the credentials are the final thing on screen.
-        print_result(args, user, personality, args.premium, tokens)
+        print_result(args, user, personality, args.premium, tokens, replaced)
 
     except SystemExit:
         raise
     except Exception as e:
         db.rollback()
-        die(f"{type(e).__name__}: {e}\n        Rolled back — no account was created.")
+        detail = "\n        Rolled back — no account was created."
+        if replaced:
+            # The delete and the insert shared one transaction, so the
+            # rollback undid the delete too. Say so explicitly: "no account
+            # was created" alone would read as though the old one was lost.
+            detail += (
+                f"\n        The existing account for {args.phone.strip()} was NOT deleted — the rollback"
+                f"\n        restored it intact, original password and all."
+                f"\n        {snapshot_path} is therefore a snapshot of a live"
+                f"\n        account rather than a deleted one; remove it if you don't want it."
+            )
+        die(f"{type(e).__name__}: {e}{detail}")
     finally:
         db.close()
 

@@ -329,12 +329,19 @@ def replace_existing(db, user: User, counts: dict[str, int]) -> Path:
     if snapshot is None:
         die("Refusing to delete an account without a snapshot on disk.")
     print(f"{_c('..', DIM)} snapshot written to {snapshot}")
-    # One DELETE; all 16 child tables cascade at the database level
-    # (verified against the live schema, including the NO ACTION
-    # core_personalities -> recommendation_profiles constraint, which is
-    # checked at end-of-statement and so does not block this).
-    db.delete(user)
-    db.flush()
+    # Raw SQL, deliberately not db.delete(user). The ORM honours
+    # User.core_personality's cascade="all, delete-orphan" by issuing its own
+    # separate `DELETE FROM core_personalities`, and recommendation_profiles
+    # has a NO ACTION foreign key to that table with no ORM relationship from
+    # User to clean it up — so that standalone statement raises
+    # ForeignKeyViolation while the rows that would satisfy it are still
+    # there. One `DELETE FROM users` avoids this entirely: every child table
+    # cascades inside a single statement, and NO ACTION is only checked once
+    # that statement completes, by which point nothing references the row.
+    db.execute(text("DELETE FROM users WHERE id = :uid"), {"uid": str(user.id)})
+    # The session still has the deleted user (and its loaded children) in its
+    # identity map; drop them so nothing tries to flush them back.
+    db.expunge_all()
     print(f"{_c('..', DIM)} deleted the old account and its data")
     return snapshot
 

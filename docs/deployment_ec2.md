@@ -1,5 +1,13 @@
 # Deploying gio-backend on a shared EC2 instance
 
+> **Scope note (added 2026-10-16):** this is the **first-time bootstrap** record —
+> use it when standing up a *new* box. The existing production deploy is now fully
+> documented in [deployment_runbook.md](deployment_runbook.md), which supersedes
+> this file for any routine deploy, redeploy, migration, env change or rollback.
+> Placeholders below (`<your-hostname>`, `<port>`) resolve in production to
+> `aurenapi.giobyquartzic.com` and host port `8011`, with the code at
+> `/opt/gio-backend`. Step 8's frontend note is still accurate and still applies.
+
 The correct procedure, distilled from actually doing it once (2026-10-02)
 against `i-0805258d6f2600150` ("bracelet-api-backend", Amazon Linux 2023,
 `ap-southeast-5`). That box is **not** a blank instance — it already runs

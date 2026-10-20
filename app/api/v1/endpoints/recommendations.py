@@ -9,6 +9,7 @@ from app.models.user import User
 from app.schemas.recommendation import RecommendationOut
 from app.services.content import COLOURS
 from app.services.entitlement import is_premium_active
+from app.services.recommendation import ensure_recommendation
 
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
 
@@ -26,15 +27,21 @@ def _serialize(profile: RecommendationProfile) -> RecommendationOut:
 
 @router.get("/latest", response_model=RecommendationOut)
 def get_latest_recommendation(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    profile = (
-        db.query(RecommendationProfile)
-        .options(selectinload(RecommendationProfile.items))
-        .filter_by(user_id=user.id)
-        .order_by(RecommendationProfile.generated_at.desc())
-        .first()
-    )
+    """Today's recommendation, generated on the spot if there isn't one.
+
+    Deliberately a sync `def`: ensure_recommendation reaches
+    _refresh_product_items, which calls asyncio.run() internally. That throws
+    inside a running event loop, so this must stay on FastAPI's threadpool
+    rather than becoming `async def`.
+
+    404 now means one thing only — this account has never completed a
+    check-in or Inner Reading, so there is no inner state to build from.
+    """
+    profile = ensure_recommendation(db, user)
     if not profile:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Complete a check-in or Inner Reading first.")
+    db.commit()
+    db.refresh(profile)
     return _serialize(profile)
 
 

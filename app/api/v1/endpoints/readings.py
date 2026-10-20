@@ -19,7 +19,8 @@ from app.schemas.reflection import (
     QuestionSetOut,
 )
 from app.services import gamification as gam
-from app.services.ai_outcome import generate_reading_outcome, generate_reading_secondary_language
+from app.services.ai_outcome import generate_reading_outcome
+from app.services.reading_language import OTHER_LANGUAGE, fill_secondary_language, set_field
 from app.services.cascade import apply_reflection_side_effects
 from app.services.content import AFFIRMATIONS, INSIGHTS, REFLECTION_QUESTIONS
 from app.services.entitlement import INNER_READING_WEEKLY_FREE_LIMIT, inner_reading_weekly_count, is_premium_active
@@ -31,79 +32,34 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/inner-readings", tags=["inner-readings"])
 
-_OTHER_LANGUAGE = {"en": "zh", "zh": "en"}
-
-_LIFE_AREA_KEYS = ("work", "relationships", "personal_growth", "conflict_management")
-
-
 async def _generate_secondary_language(reading_id: uuid.UUID, language: str) -> None:
-    """Fills in the language the user did not ask for, after the response
-    has already gone out (FastAPI BackgroundTasks) — same shape as
+    """Fills in the language the user did not ask for, after the response has
+    already gone out (FastAPI BackgroundTasks) — same shape as
     core_personality.py::_generate_secondary_language, including its own
-    short-lived session, since the request's is closed by the time this
-    runs.
+    short-lived session, since the request's is closed by the time this runs.
 
-    A failure here is not fatal: the reading keeps its primary language and
-    stays PARTIAL, and the frontend falls back to whichever language is
-    present. It just never silently flips to READY.
+    The generation itself lives in services/reading_language.py, shared with
+    scripts/backfill_reading_language.py. This wrapper only owns the session
+    and makes sure a failure can never take down the worker: the reading is
+    already saved and usable in its primary language, so it just stays
+    PARTIAL rather than silently flipping to READY.
     """
     db = SessionLocal()
     try:
         reading = db.get(InnerReading, reading_id)
         if reading is None:
             return
-
-        primary = reading.primary_language or "en"
-        content = await generate_reading_secondary_language(
-            language=language,
-            dims={
-                "emotional_energy": reading.emotional_energy or 0,
-                "mental_clarity": reading.mental_clarity or 0,
-                "inner_pressure": reading.inner_pressure or 0,
-                "grounding": reading.grounding or 0,
-            },
-            focus_label=focus_label_for(resolve_focus_key({
-                "emotional_energy": reading.emotional_energy or 0,
-                "mental_clarity": reading.mental_clarity or 0,
-                "inner_pressure": reading.inner_pressure or 0,
-                "grounding": reading.grounding or 0,
-            })),
-            primary_language=primary,
-            primary_narrative=_field(reading, "narrative", primary) or "",
-            primary_title=_field(reading, "title", primary) or "",
-            primary_subtitle=_field(reading, "subtitle", primary) or "",
-            primary_life_areas=_field(reading, "life_area_insights", primary) or {},
-        )
-
-        _set_field(reading, "narrative", language, content.narrative)
-        _set_field(reading, "title", language, content.title)
-        _set_field(reading, "subtitle", language, content.subtitle)
-        _set_field(reading, "life_area_insights", language, {
-            "work": content.life_area_work,
-            "relationships": content.life_area_relationships,
-            "personal_growth": content.life_area_personal_growth,
-            "conflict_management": content.life_area_conflict_management,
-        })
-        reading.generation_status = "READY"
-        db.commit()
-        logger.info("Inner reading %s: %s version generated, now READY.", reading_id, language)
+        if await fill_secondary_language(db, reading, language):
+            db.commit()
+            logger.info("Inner reading %s: %s version generated, now READY.", reading_id, language)
+        else:
+            db.rollback()
     except Exception:
-        # Never let a background failure take down the worker — the reading
-        # is already saved and usable in its primary language.
-        logger.exception("Inner reading %s: %s version failed to generate.", reading_id, language)
+        logger.exception("Inner reading %s: background %s generation crashed.", reading_id, language)
         db.rollback()
     finally:
         db.close()
 
-
-def _field(reading: InnerReading, name: str, language: str):
-    """English lives in the unsuffixed column, Chinese in `<name>_zh` — the
-    same layout CheckInSession uses, so there is no `_en` suffix to read."""
-    return getattr(reading, name if language == "en" else f"{name}_zh")
-
-
-def _set_field(reading: InnerReading, name: str, language: str, value) -> None:
-    setattr(reading, name if language == "en" else f"{name}_zh", value)
 
 
 
@@ -195,10 +151,10 @@ async def submit_inner_reading(
     )
     # The generated body goes into whichever language column was asked for;
     # the other is filled by the background task below.
-    _set_field(reading, "narrative", language, ai_outcome.narrative)
-    _set_field(reading, "title", language, ai_outcome.title)
-    _set_field(reading, "subtitle", language, ai_outcome.subtitle)
-    _set_field(reading, "life_area_insights", language, {
+    set_field(reading, "narrative", language, ai_outcome.narrative)
+    set_field(reading, "title", language, ai_outcome.title)
+    set_field(reading, "subtitle", language, ai_outcome.subtitle)
+    set_field(reading, "life_area_insights", language, {
         "work": ai_outcome.life_area_work,
         "relationships": ai_outcome.life_area_relationships,
         "personal_growth": ai_outcome.life_area_personal_growth,
@@ -243,7 +199,7 @@ async def submit_inner_reading(
 
     # Queued after the commit, so the row the task loads in its own session
     # definitely exists. Runs once the response has been sent.
-    background_tasks.add_task(_generate_secondary_language, reading.id, _OTHER_LANGUAGE[language])
+    background_tasks.add_task(_generate_secondary_language, reading.id, OTHER_LANGUAGE[language])
 
     return InnerReadingSubmitResponse(
         reading_id=reading.id,

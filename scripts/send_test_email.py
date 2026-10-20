@@ -13,8 +13,15 @@ port for the TLS mode, etc.).
 """
 import argparse
 import sys
+from pathlib import Path
 
-from app.services.mail import send_email
+# `python scripts/send_test_email.py` puts /app/scripts on sys.path, not /app,
+# so the `app` package is not importable without this — same shim as
+# scripts/create_account.py. Keeps the documented invocation working instead
+# of requiring PYTHONPATH=/app or `python -m`.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from app.services.mail import send_email  # noqa: E402
 
 
 def main() -> int:

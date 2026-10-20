@@ -33,6 +33,8 @@ from decimal import Decimal, InvalidOperation
 
 from sqlalchemy.orm import Session
 
+from app.database import SessionLocal
+
 from app.models.recommendation import RecommendationItem, RecommendationProfile
 from app.models.reflection import InnerStateSnapshot
 from app.models.user import User
@@ -40,8 +42,10 @@ from app.services.ai_recommendation import generate_recommendation
 from app.services.content import COLOURS, FOCUS_COPY, FOCUS_TO_COLOUR, FOCUS_TO_MATERIAL, STONE_TYPES
 from app.services.gamification import today_utc
 from app.services.lumenart import get_phone_case_candidates
+from app.services.narrative import lock_user
 from app.services.narrative_prompt import build_narrative_prompt
 from app.services.product_api import fetch_products, parse_specifications
+from app.services.scoring import resolve_focus_key
 
 logger = logging.getLogger(__name__)
 
@@ -257,3 +261,81 @@ def build_recommendation(
 
     db.flush()
     return profile
+
+
+def ensure_recommendation(db: Session, user: User) -> RecommendationProfile | None:
+    """Today's recommendation for `user`, generating one if there isn't one.
+
+    The second way a profile comes into being. The first is a check-in or
+    reading submission (cascade.py); this one covers everybody who simply
+    opens the app — including accounts whose only reflections predate the
+    feature, who otherwise would never get a recommendation at all.
+
+    Returns None only when there is genuinely nothing to build from: no
+    InnerStateSnapshot has ever been written for this user, which means they
+    have never completed a check-in or reading. That is the sole empty case.
+
+    Cheap when today's profile already exists — build_recommendation finds it
+    by `(user_id, recommendation_date)` and refreshes only the deterministic
+    COLOUR/ROUTINE items, re-running the product fetch solely if an earlier
+    attempt today left none.
+    """
+    snapshot = (
+        db.query(InnerStateSnapshot)
+        .filter_by(user_id=user.id)
+        .order_by(InnerStateSnapshot.created_at.desc())
+        .first()
+    )
+    if snapshot is None:
+        return None
+
+    # build_recommendation's docstring requires the caller to have serialized
+    # this user first — without it, a page load racing the login warm-up
+    # violates the (user_id, recommendation_date) unique constraint.
+    lock_user(db, user)
+
+    dims = {
+        "emotional_energy": snapshot.emotional_energy,
+        "mental_clarity": snapshot.mental_clarity,
+        "inner_pressure": snapshot.inner_pressure,
+        "grounding": snapshot.grounding,
+    }
+    return build_recommendation(
+        db,
+        user=user,
+        snapshot=snapshot,
+        core_personality_id=user.core_personality.id if user.core_personality else None,
+        focus_key=resolve_focus_key(dims),
+        personality_title=user.core_personality.title_en if user.core_personality else None,
+        # The trigger is carried forward from the snapshot rather than left
+        # null: ck_recommendation_single_trigger requires exactly one, and
+        # naming the reflection this state actually came from is truer than
+        # inventing a "page load" trigger type.
+        trigger_type=snapshot.source_type,
+        trigger_check_in_session_id=snapshot.check_in_session_id,
+        trigger_inner_reading_id=snapshot.inner_reading_id,
+    )
+
+
+def warm_recommendation(user_id) -> None:
+    """Fire-and-forget cache warm for background tasks (login/refresh).
+
+    Owns its own session — the request's is closed by the time a
+    BackgroundTask runs. Never raises: a failed warm just means the page
+    generates on load instead, which is the behaviour without this.
+    """
+    db = SessionLocal()
+    try:
+        user = db.get(User, user_id)
+        if user is None:
+            return
+        if ensure_recommendation(db, user) is not None:
+            db.commit()
+            logger.info("Recommendation warmed for user=%s.", user_id)
+        else:
+            db.rollback()
+    except Exception:
+        logger.exception("Recommendation warm failed for user=%s.", user_id)
+        db.rollback()
+    finally:
+        db.close()

@@ -7,7 +7,7 @@ from app.dependencies import get_current_user, get_db
 from app.models.gamification import UserReward
 from app.models.user import User
 from app.schemas.gamification import RewardOut
-from app.services.content import REWARD_DEFINITIONS
+from app.services.content import REWARD_DEFINITIONS, reward_display
 
 router = APIRouter(prefix="/rewards", tags=["rewards"])
 
@@ -19,7 +19,7 @@ def list_rewards(user: User = Depends(get_current_user), db: Session = Depends(g
     for r in REWARD_DEFINITIONS:
         state = states.get(r["key"])
         result.append(RewardOut(
-            key=r["key"], title=r["title"], description=r["description"], icon=r["icon"], requirement=r["requirement"],
+            key=r["key"], **reward_display(r),
             state=state.state if state else "LOCKED",
             unlocked_at=state.unlocked_at.isoformat() if state and state.unlocked_at else None,
             redeemed_at=state.redeemed_at.isoformat() if state and state.redeemed_at else None,
@@ -39,8 +39,7 @@ def redeem_reward(key: str, user: User = Depends(get_current_user), db: Session 
     state.redeemed_at = datetime.now(timezone.utc)
     db.commit()
     return RewardOut(
-        key=definition["key"], title=definition["title"], description=definition["description"],
-        icon=definition["icon"], requirement=definition["requirement"], state=state.state,
+        key=definition["key"], **reward_display(definition), state=state.state,
         unlocked_at=state.unlocked_at.isoformat() if state.unlocked_at else None,
         redeemed_at=state.redeemed_at.isoformat(),
     )

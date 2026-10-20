@@ -6,7 +6,7 @@ from app.models.gamification import UserBadge
 from app.models.user import User
 from app.schemas.gamification import BadgeOut, GardenOut, ProgressOut, StreakOut, UnlockedContentOut, UnlockedItemOut
 from app.services import gamification as gam
-from app.services.content import BADGE_DEFINITIONS
+from app.services.content import BADGE_DEFINITIONS, badge_display
 
 router = APIRouter(prefix="/progress", tags=["progress"])
 
@@ -23,7 +23,7 @@ def get_progress(user: User = Depends(get_current_user), db: Session = Depends(g
     earned = {r.badge_key: r.earned_at for r in db.query(UserBadge).filter_by(user_id=user.id).all()}
     badges = [
         BadgeOut(
-            key=b["key"], group=b["group"], title=b["title"], description=b["description"], icon=b["icon"],
+            key=b["key"], **badge_display(b),
             earned=b["key"] in earned, earned_at=earned[b["key"]].isoformat() if b["key"] in earned else None,
         )
         for b in BADGE_DEFINITIONS

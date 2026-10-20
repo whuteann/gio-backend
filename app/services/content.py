@@ -285,13 +285,17 @@ FOCUS_TO_MATERIAL = {
 # type for a recommendation's product set).
 STONE_TYPES = ("Crystal", "Nephrite", "Jade")
 
+# Bilingual, same `field`/`field_zh` convention as FOCUS_COPY and COLOURS
+# above. Served straight to the UI (progress + dashboard badge tiles), so a
+# missing _zh here is untranslated text on screen — there is no AI step in
+# between to fall back on.
 BADGE_DEFINITIONS = [
-    {"key": "three_day_streak", "group": "consistency", "title": "Three Days Steady", "description": "Reflected three days in a row.", "icon": "🌤️"},
-    {"key": "two_week_rhythm", "group": "consistency", "title": "Two-Week Rhythm", "description": "Kept a 14-day reflection streak.", "icon": "🕰️"},
-    {"key": "first_insight", "group": "depth", "title": "First Insight", "description": "Completed your first Inner Reading.", "icon": "🔍"},
-    {"key": "deep_diver", "group": "depth", "title": "Deep Diver", "description": "Completed five Inner Readings.", "icon": "🌊"},
-    {"key": "first_bloom", "group": "growth", "title": "First Bloom", "description": "Grew your Garden to full bloom in a week.", "icon": "🌸"},
-    {"key": "momentum", "group": "growth", "title": "Momentum", "description": "Earned 300 total XP.", "icon": "⚡"},
+    {"key": "three_day_streak", "group": "consistency", "title": "Three Days Steady", "title_zh": "稳稳三天", "description": "Reflected three days in a row.", "description_zh": "连续三天进行了反思。", "icon": "🌤️"},
+    {"key": "two_week_rhythm", "group": "consistency", "title": "Two-Week Rhythm", "title_zh": "两周节奏", "description": "Kept a 14-day reflection streak.", "description_zh": "保持了 14 天的反思连续纪录。", "icon": "🕰️"},
+    {"key": "first_insight", "group": "depth", "title": "First Insight", "title_zh": "初次洞察", "description": "Completed your first Inner Reading.", "description_zh": "完成了你的第一次深度解读。", "icon": "🔍"},
+    {"key": "deep_diver", "group": "depth", "title": "Deep Diver", "title_zh": "深潜者", "description": "Completed five Inner Readings.", "description_zh": "完成了五次深度解读。", "icon": "🌊"},
+    {"key": "first_bloom", "group": "growth", "title": "First Bloom", "title_zh": "初次绽放", "description": "Grew your Garden to full bloom in a week.", "description_zh": "在一周内让你的花园完全绽放。", "icon": "🌸"},
+    {"key": "momentum", "group": "growth", "title": "Momentum", "title_zh": "势能", "description": "Earned 300 total XP.", "description_zh": "累计获得 300 点经验值。", "icon": "⚡"},
 ]
 BADGE_DEFINITIONS_BY_KEY = {b["key"]: b for b in BADGE_DEFINITIONS}
 
@@ -313,12 +317,27 @@ def _reward_archetype_deep_dive(ctx: dict) -> bool:
 
 
 REWARD_DEFINITIONS = [
-    {"key": "golden_hour_playlist", "title": "Golden Hour Playlist", "description": "A wind-down playlist curated for grounding evenings.", "icon": "🎧", "requirement": "Reach 50 XP", "is_eligible": _reward_golden_hour},
-    {"key": "grounding_ritual_guide", "title": "Grounding Ritual Guide", "description": "A short guide to a 5-minute grounding ritual.", "icon": "📖", "requirement": "Reach 150 XP", "is_eligible": _reward_grounding_ritual},
-    {"key": "founding_streak_candle", "title": "Founding Streak Candle Discount", "description": "15% toward any candle in the Gio store.", "icon": "🕯️", "requirement": "Reach a 7-day streak", "is_eligible": _reward_founding_candle},
-    {"key": "archetype_deep_dive", "title": "Archetype Deep-Dive Report", "description": "An extended written breakdown of your archetype.", "icon": "📜", "requirement": "Earn 3 badges", "is_eligible": _reward_archetype_deep_dive},
+    {"key": "golden_hour_playlist", "title": "Golden Hour Playlist", "title_zh": "黄昏时光歌单", "description": "A wind-down playlist curated for grounding evenings.", "description_zh": "为安定的夜晚精选的放松歌单。", "icon": "🎧", "requirement": "Reach 50 XP", "requirement_zh": "累计达到 50 点经验值", "is_eligible": _reward_golden_hour},
+    {"key": "grounding_ritual_guide", "title": "Grounding Ritual Guide", "title_zh": "扎根仪式指南", "description": "A short guide to a 5-minute grounding ritual.", "description_zh": "一份五分钟扎根仪式的简短指南。", "icon": "📖", "requirement": "Reach 150 XP", "requirement_zh": "累计达到 150 点经验值", "is_eligible": _reward_grounding_ritual},
+    {"key": "founding_streak_candle", "title": "Founding Streak Candle Discount", "title_zh": "创始连续纪录蜡烛折扣", "description": "15% toward any candle in the Gio store.", "description_zh": "Gio 商店任意蜡烛可享 15% 折扣。", "icon": "🕯️", "requirement": "Reach a 7-day streak", "requirement_zh": "达成 7 天连续纪录", "is_eligible": _reward_founding_candle},
+    {"key": "archetype_deep_dive", "title": "Archetype Deep-Dive Report", "title_zh": "原型深度解析报告", "description": "An extended written breakdown of your archetype.", "description_zh": "一份关于你的原型的延伸文字解析。", "icon": "📜", "requirement": "Earn 3 badges", "requirement_zh": "获得 3 枚徽章", "is_eligible": _reward_archetype_deep_dive},
 ]
 REWARD_DEFINITIONS_BY_KEY = {r["key"]: r for r in REWARD_DEFINITIONS}
+
+# The display fields each definition hands to its *Out schema. Kept as one
+# list per type because badges and rewards are each built at more than one
+# call site — threading a new field by hand at each of them is how one site
+# ends up silently serving None (and so, English) forever.
+BADGE_DISPLAY_FIELDS = ("group", "title", "title_zh", "description", "description_zh", "icon")
+REWARD_DISPLAY_FIELDS = ("title", "title_zh", "description", "description_zh", "icon", "requirement", "requirement_zh")
+
+
+def badge_display(definition: dict) -> dict:
+    return {f: definition.get(f) for f in BADGE_DISPLAY_FIELDS}
+
+
+def reward_display(definition: dict) -> dict:
+    return {f: definition.get(f) for f in REWARD_DISPLAY_FIELDS}
 
 # Premium pricing — deterministic, confirmed pricing (docs/behaviour_log_0009.md),
 # not something an AI call or a database row should own. Yearly is 12

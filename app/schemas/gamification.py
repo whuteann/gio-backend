@@ -17,8 +17,12 @@ class GardenOut(BaseModel):
 class BadgeOut(BaseModel):
     key: str
     group: str
+    # `_zh` optional so an older definition without a translation still
+    # serializes; the frontend falls back to the English field.
     title: str
+    title_zh: str | None = None
     description: str
+    description_zh: str | None = None
     icon: str
     earned: bool
     earned_at: str | None
@@ -35,9 +39,12 @@ class ProgressOut(BaseModel):
 class RewardOut(BaseModel):
     key: str
     title: str
+    title_zh: str | None = None
     description: str
+    description_zh: str | None = None
     icon: str
     requirement: str
+    requirement_zh: str | None = None
     state: str
     unlocked_at: str | None
     redeemed_at: str | None

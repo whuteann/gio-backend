@@ -28,6 +28,10 @@ class CheckInSubmitRequest(BaseModel):
 
 class InnerReadingSubmitRequest(BaseModel):
     answers: list[AnswerIn]
+    # Which language to write this reading in, synchronously. The other one
+    # is generated in the background (readings.py). Optional so an older
+    # client still works — the account's preferred_language is used then.
+    language: str = "en"
 
 
 class OutcomeOut(BaseModel):
@@ -96,12 +100,25 @@ class InnerReadingOut(BaseModel):
     inner_pressure: int | None
     grounding: int | None
     result_summary: str | None
+    result_summary_zh: str | None = None
     narrative: str | None
+    narrative_zh: str | None = None
     insight: str | None
+    insight_zh: str | None = None
     reflection_question: str | None
+    reflection_question_zh: str | None = None
     title: str | None
+    title_zh: str | None = None
     subtitle: str | None
+    subtitle_zh: str | None = None
+    current_focus: str | None = None
+    current_focus_zh: str | None = None
     life_area_insights: dict[str, str] | None = None
+    life_area_insights_zh: dict[str, str] | None = None
+    # "en" | "zh" — which language was written synchronously. PARTIAL until
+    # the other one lands, then READY (same meaning as CorePersonality's).
+    primary_language: str | None = None
+    generation_status: str = "PARTIAL"
     is_premium_content: bool = False
     # Listing metadata (category chip + avatar emoji) — always present,
     # never gated, deterministic from the reading's own dims

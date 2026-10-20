@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class SubscriptionOut(BaseModel):
@@ -43,6 +43,11 @@ class UpdateProfileRequest(BaseModel):
     display_name: str | None = None
     preferred_language: str | None = None
     timezone: str | None = None
+    # Added so accounts created before email was collected at signup can
+    # acquire one — without it they can never use the forgot-password flow,
+    # which is keyed on email. Omitting the field leaves the address
+    # untouched; there is deliberately no way to clear it back to null.
+    email: EmailStr | None = None
 
 
 class ChangePasswordRequest(BaseModel):

@@ -106,14 +106,21 @@ def reading_content_for_plan(reading, premium: bool) -> dict:
     if premium:
         return {
             "narrative": reading.narrative,
+            "narrative_zh": reading.narrative_zh,
             "life_area_insights": reading.life_area_insights,
+            "life_area_insights_zh": reading.life_area_insights_zh,
             "is_premium_content": True,
             "category": tag["category"],
             "emoji": tag["emoji"],
         }
+    # Both languages are gated identically — truncating only the English
+    # column would hand a free user the full reading just by switching the
+    # app to Chinese.
     return {
         "narrative": truncate_words(reading.narrative, 100) if reading.narrative else reading.narrative,
+        "narrative_zh": truncate_words(reading.narrative_zh, 100) if reading.narrative_zh else reading.narrative_zh,
         "life_area_insights": None,
+        "life_area_insights_zh": None,
         "is_premium_content": False,
         "category": tag["category"],
         "emoji": tag["emoji"],

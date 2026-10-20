@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
 from app.dependencies import get_current_user, get_db
 from app.models.user import User
 from app.schemas.user import ChangePasswordRequest, MeOut, UpdateProfileRequest, UserOut
+from app.services.auth import email_taken, normalize_email
 
 router = APIRouter(prefix="/me", tags=["me"])
 
@@ -22,6 +23,16 @@ def update_me(payload: UpdateProfileRequest, user: User = Depends(get_current_us
         user.preferred_language = payload.preferred_language
     if payload.timezone is not None:
         user.timezone = payload.timezone
+    if payload.email is not None:
+        # Same UNIQUE constraint as registration — check first or the commit
+        # raises UniqueViolation and this returns 500 instead of 409.
+        email = normalize_email(payload.email)
+        if email and email_taken(db, email, exclude_user_id=user.id):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="An account with this email address already exists.",
+            )
+        user.email = email
     db.commit()
     db.refresh(user)
     return user

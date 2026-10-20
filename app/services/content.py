@@ -367,7 +367,28 @@ JOURNAL_THEMES = [
 ]
 
 
+# Chinese is written without spaces, so `text.split()` returns one "word"
+# for an entire paragraph and a word limit never fires — a free user would
+# get the whole reading simply by switching the app to Chinese. CJK text is
+# capped by character count instead. ~5.5 characters per English word is the
+# usual rough equivalence, so 100 words lands near this figure.
+_CJK_CHAR_LIMIT = 170
+
+
+def _is_cjk(text: str) -> bool:
+    """True when the text is mostly CJK — cheap heuristic, enough to pick a
+    truncation strategy. Covers the CJK Unified Ideographs block plus the
+    fullwidth punctuation that comes with it."""
+    cjk = sum(1 for ch in text if "\u4e00" <= ch <= "\u9fff" or "\u3000" <= ch <= "\u303f" or "\uff00" <= ch <= "\uffef")
+    stripped = [ch for ch in text if not ch.isspace()]
+    return bool(stripped) and cjk / len(stripped) > 0.3
+
+
 def truncate_words(text: str, limit: int = 100) -> str:
+    if _is_cjk(text):
+        if len(text) <= _CJK_CHAR_LIMIT:
+            return text
+        return text[:_CJK_CHAR_LIMIT] + "…"
     words = text.split()
     if len(words) <= limit:
         return text

@@ -30,3 +30,34 @@ class TokenResponse(BaseModel):
 
 class RefreshRequest(BaseModel):
     refresh_token: str
+
+
+# --- Forgot-password flow (see PASSWORD_RESET_PLAN.md) ---------------------
+
+_OTP_PATTERN = r"^\d{6}$"
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class VerifyResetOtpRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(pattern=_OTP_PATTERN)
+
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(pattern=_OTP_PATTERN)
+    # Same rule as ChangePasswordRequest and the register form, so all three
+    # reject exactly the same passwords. The "confirm password" field is a
+    # frontend-only check — a second identical value buys the API nothing.
+    new_password: str = Field(min_length=6)
+
+
+class GenericDetailResponse(BaseModel):
+    detail: str
+
+
+class OtpValidResponse(BaseModel):
+    valid: bool

@@ -28,7 +28,11 @@ bilingual JSONB shape yet (behaviour_log_0002.md Phase E).
 from openai import AsyncOpenAI
 
 from app.config import settings
-from app.schemas.ai_outcome import CheckInOutcomeGeneration, InnerReadingOutcomeGeneration
+from app.schemas.ai_outcome import (
+    CheckInOutcomeGeneration,
+    InnerReadingOutcomeGeneration,
+    InnerReadingSecondaryLanguageGeneration,
+)
 from app.services.content import AFFIRMATIONS, INSIGHT_IDS_BY_FOCUS, INSIGHTS, REFLECTION_QUESTIONS
 
 _client = AsyncOpenAI(api_key=settings.openai_api_key)
@@ -136,17 +140,25 @@ Output rules:
 # code, recent NarrativeEntry history for continuity), extended with Inner
 # Reading's own record content (narrative/title/subtitle) and the 4
 # life-area fields, all in the one call rather than a second round trip.
+
+# Mirrors ai_personality.LANGUAGE_NAMES — the model is told the language by
+# name, not by code.
+READING_LANGUAGE_NAMES = {"en": "English", "zh": "Chinese (Simplified)"}
+
 async def generate_reading_outcome(
     *,
     dims: dict[str, int],
     focus_label: str,
     focus_key: str,
     recent_narrative_summaries: list[str],
+    language: str = "en",
 ) -> InnerReadingOutcomeGeneration:
     if recent_narrative_summaries:
         memory_block = "\n".join(f"- {s}" for s in recent_narrative_summaries)
     else:
         memory_block = "(none yet — this is the first recorded check-in or reading for this user)"
+
+    language_name = READING_LANGUAGE_NAMES.get(language, "English")
 
     prompt = f"""\
 A user just completed an Inner Reading — a slower, more considered \
@@ -169,7 +181,7 @@ that isn't there):
 
 {_library_block(focus_key)}
 
-Write the following, in English unless noted otherwise:
+Write the following, in {language_name} unless noted otherwise:
 - affirmation_id, reflection_question_id, insight_id: as instructed above.
 - reminder: one short, warm reminder for the user to carry with them today.
 - current_focus: a short (2-5 word) phrase naming the user's ongoing
@@ -194,8 +206,10 @@ Output rules:
 - reminder, current_focus, and friendly_advice are each written in both
   English (`en`) and Chinese (`zh`) — genuine, natural phrasing in each
   language, not a literal translation of one into the other.
-  narrative_summary, narrative, title, subtitle, and the 4 life_area_*
-  fields are each a single plain string, English only, for now.
+  narrative, title, subtitle and the 4 life_area_* fields are each a
+  single plain string written in {language_name}. narrative_summary is
+  the exception: always English, since it is never shown to the user and
+  only ever read back as memory context.
 - Every free-text field is plain text (no markdown, no bullet points).
 - reminder/current_focus/friendly_advice/narrative_summary stay genuinely
   short, matching a daily check-in's brevity — narrative, title, subtitle,
@@ -212,5 +226,75 @@ Output rules:
         text_format=InnerReadingOutcomeGeneration,
         # No `temperature` — see app/services/ai_personality.py's note on
         # the configured model rejecting that parameter.
+    )
+    return response.output_parsed
+
+
+async def generate_reading_secondary_language(
+    *,
+    language: str,
+    dims: dict[str, int],
+    focus_label: str,
+    primary_language: str,
+    primary_narrative: str,
+    primary_title: str,
+    primary_subtitle: str,
+    primary_life_areas: dict[str, str],
+) -> InnerReadingSecondaryLanguageGeneration:
+    """The other language for a reading that already exists.
+
+    Writes the same reading again rather than translating it word for word
+    — the house convention everywhere else bilingual content is produced
+    (ai_personality, the BilingualText fields above). It is given the
+    already-written version so the two say the same thing about the same
+    moment; without that the user would get two different readings
+    depending on which language they happened to open.
+    """
+    language_name = READING_LANGUAGE_NAMES.get(language, "English")
+    source_name = READING_LANGUAGE_NAMES.get(primary_language, "English")
+
+    life_area_block = "\n".join(f"- {k}: {v}" for k, v in primary_life_areas.items())
+
+    prompt = f"""\
+This Inner Reading has already been written for the user in {source_name}.
+Write the same reading in {language_name}.
+
+The computed values behind it, unchanged:
+- Emotional Energy: {dims["emotional_energy"]}/100
+- Mental Clarity: {dims["mental_clarity"]}/100
+- Inner Pressure: {dims["inner_pressure"]}/100
+- Grounding: {dims["grounding"]}/100
+- Current focus: {focus_label}
+
+The existing {source_name} version:
+- title: {primary_title}
+- subtitle: {primary_subtitle}
+- narrative: {primary_narrative}
+- life areas:
+{life_area_block}
+
+Write, entirely in {language_name}:
+- narrative, title, subtitle, and life_area_work,
+  life_area_relationships, life_area_personal_growth,
+  life_area_conflict_management.
+
+Output rules:
+- Say the same things about the same moment as the version above — same
+  observations, same advice, same emphasis. A reader fluent in both must
+  not find one version telling them something the other doesn't.
+- Write naturally in {language_name}. Do not translate phrase by phrase:
+  produce what a native writer would have written for this reading.
+- Match the existing version's length and structure (narrative stays 3-5
+  sentences, each life area one short paragraph).
+- Plain text only, no markdown, warm second-person voice.
+"""
+
+    response = await _client.responses.parse(
+        model=settings.openai_model,
+        input=[
+            {"role": "system", "content": _SYSTEM_MESSAGE},
+            {"role": "user", "content": prompt},
+        ],
+        text_format=InnerReadingSecondaryLanguageGeneration,
     )
     return response.output_parsed

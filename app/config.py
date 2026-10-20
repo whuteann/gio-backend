@@ -57,6 +57,21 @@ class Settings(BaseSettings):
     lumenart_client_id: str = "f4419f5d1f511b2a69aa6b7e152dfc8f"
     lumenart_client_secret: str = ""
 
+    # Outbound email (app/services/mail.py) — plain smtplib, same proven
+    # approach as bracelet-management-backend's app/services/
+    # appointment_notifications.py, not a new dependency. All optional:
+    # mail_server empty means "not configured," and send_email() no-ops
+    # with a warning log rather than raising — no caller is forced to
+    # handle an email outage as if it were its own failure.
+    mail_server: str = ""
+    mail_port: int = 587
+    mail_username: str = ""
+    mail_password: str = ""
+    mail_from: str = ""
+    mail_from_name: str = "Auren"
+    mail_verify_tls: bool = True
+    mail_timeout_seconds: int = 20
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

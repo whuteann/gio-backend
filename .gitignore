@@ -3,6 +3,9 @@ __pycache__/
 .venv/
 venv/
 .env
+# Any .env variant (.env.local, .env.bak-*, ...) — only the example is tracked.
+.env.*
+!.env.example
 *.log
 
 # scripts/create_account.py --replace writes pre-delete account snapshots here

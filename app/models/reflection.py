@@ -118,18 +118,45 @@ class InnerReading(Base):
     mental_clarity = Column(SmallInteger, nullable=True)
     inner_pressure = Column(SmallInteger, nullable=True)
     grounding = Column(SmallInteger, nullable=True)
+    # Bilingual, following CheckInSession above: the unsuffixed column holds
+    # English, `_zh` the Chinese. Unlike check-in — whose copy is short
+    # enough to generate in both languages in one call — a reading's body is
+    # the heaviest generation in the app, so it uses Core Personality's
+    # two-phase shape instead: the language the user asked for is written
+    # synchronously, the other arrives from a BackgroundTask (see
+    # readings.py::_generate_secondary_language) and flips
+    # `generation_status` to READY.
     result_summary = Column(String, nullable=True)
+    result_summary_zh = Column(String, nullable=True)
     narrative = Column(String, nullable=True)
+    narrative_zh = Column(String, nullable=True)
     insight = Column(String, nullable=True)
+    insight_zh = Column(String, nullable=True)
     reflection_question = Column(String, nullable=True)
+    reflection_question_zh = Column(String, nullable=True)
     title = Column(String, nullable=True)
+    title_zh = Column(String, nullable=True)
     subtitle = Column(String, nullable=True)
+    subtitle_zh = Column(String, nullable=True)
+    # The AI's own phrasing of the user's ongoing journey, e.g. "Releasing
+    # pressure". Already generated bilingually for InnerStateSnapshot; kept
+    # on the reading too so the result page can show it without a second
+    # fetch of the snapshot.
+    current_focus = Column(String, nullable=True)
+    current_focus_zh = Column(String, nullable=True)
+    # "en" | "zh" — which language was generated synchronously, i.e. the one
+    # the user saw immediately.
+    primary_language = Column(String, nullable=True)
+    # PARTIAL until the second language lands, then READY. Same meaning as
+    # CorePersonality.generation_status.
+    generation_status = Column(String, nullable=False, default="PARTIAL")
     # AI-generated per reading (docs/behaviour_log_0007.md), replacing the
     # old static content.py::LIFE_AREA_INSIGHTS lookup-by-focus-key.
     # {"work": ..., "relationships": ..., "personal_growth": ...,
     # "conflict_management": ...}. Depth-gating (Premium vs free) still
     # happens at read time (scoring.py::reading_content_for_plan), not here.
     life_area_insights = Column(JSONB, nullable=True)
+    life_area_insights_zh = Column(JSONB, nullable=True)
     narrative_entry_id = Column(UUID(as_uuid=True), ForeignKey("narrative_entries.id", ondelete="SET NULL"), nullable=True)
     started_at = Column(DateTime(timezone=True), nullable=False)
     completed_at = Column(DateTime(timezone=True), nullable=True)

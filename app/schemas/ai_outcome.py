@@ -48,10 +48,11 @@ class InnerReadingOutcomeGeneration(BaseModel):
     six JSONB fields via the shared cascade) — bilingual, since that
     target column is already JSONB regardless of trigger source — plus
     Inner Reading's own record-level content (narrative/title/subtitle)
-    and the 4 life-area breakdown fields, which stay English-only for now:
-    `InnerReading`'s own columns are plain String, not yet migrated to the
-    bilingual JSONB shape (gio-member-app/docs/behaviour_log_0002.md Phase
-    E, not done in this pass)."""
+    and the 4 life-area breakdown fields. Those seven are written in one
+    language per call — the heaviest content in the app, so doubling it on
+    the blocking call is what Core Personality avoided — and the other
+    language follows from a BackgroundTask into the `_zh` columns added in
+    migration c7f2b9a04d31."""
 
     # Shared with check-in — bilingual, feeds InnerStateSnapshot's JSONB columns.
     insight_id: InsightId
@@ -62,12 +63,35 @@ class InnerReadingOutcomeGeneration(BaseModel):
     affirmation_id: AffirmationId
     narrative_summary: str
 
-    # Inner Reading's own record content — still English-only, see docstring.
+    # Inner Reading's own record content, written in the language the user
+    # asked for (see ai_outcome.generate_reading_outcome's `language`). The
+    # other language is filled in afterwards by a BackgroundTask using
+    # InnerReadingSecondaryLanguageGeneration below.
     narrative: str
     title: str
     subtitle: str
 
     # Replaces content.py::LIFE_AREA_INSIGHTS's static, focus-key-only copy.
+    life_area_work: str
+    life_area_relationships: str
+    life_area_personal_growth: str
+    life_area_conflict_management: str
+
+
+class InnerReadingSecondaryLanguageGeneration(BaseModel):
+    """The second-language pass over a reading that already exists — only
+    the seven fields InnerReadingOutcomeGeneration writes in one language.
+
+    Deliberately excludes the id-selection fields (insight/reflection/
+    affirmation) and the BilingualText ones: those were already decided and
+    already written in both languages on the first call, and re-deciding
+    them here would make the two language versions of the same reading
+    disagree about which insight the user was given.
+    """
+
+    narrative: str
+    title: str
+    subtitle: str
     life_area_work: str
     life_area_relationships: str
     life_area_personal_growth: str

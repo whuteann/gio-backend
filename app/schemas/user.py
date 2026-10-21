@@ -28,6 +28,9 @@ class UserOut(BaseModel):
     preferred_language: str
     timezone: str
     birthdate: date | None
+    # Derived from email_verified_at so the frontend never interprets a
+    # timestamp — see UserOut.from_user below.
+    email_verified: bool = True
     onboarding_completed_at: datetime | None
     core_personality_last_recalibrated_at: datetime | None
     last_login_at: datetime | None

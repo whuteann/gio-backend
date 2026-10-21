@@ -54,6 +54,54 @@ _RESET_BODY = {
 }
 
 
+_VERIFY_SUBJECT = {
+    "en": "Verify your Auren email",
+    "zh": "验证您的 Auren 邮箱",
+}
+
+_VERIFY_BODY = {
+    "en": """
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#1c1917">
+  <h1 style="font-size:20px;font-weight:600;margin:0 0 16px">Welcome to Auren</h1>
+  <p style="font-size:15px;line-height:1.6;margin:0 0 24px">
+    Hi {display_name}, use this code to verify your email and finish setting up your account:
+  </p>
+  <p style="font-size:34px;font-weight:700;letter-spacing:10px;margin:0 0 24px;color:#0f172a">{code}</p>
+  <p style="font-size:14px;line-height:1.6;color:#57534e;margin:0 0 8px">
+    It expires in {ttl} minutes and can be used once.
+  </p>
+  <p style="font-size:14px;line-height:1.6;color:#57534e;margin:0">
+    If you didn't create an Auren account, you can ignore this email.
+  </p>
+</div>
+""",
+    "zh": """
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#1c1917">
+  <h1 style="font-size:20px;font-weight:600;margin:0 0 16px">欢迎来到 Auren</h1>
+  <p style="font-size:15px;line-height:1.6;margin:0 0 24px">
+    {display_name} 您好，请使用以下验证码验证邮箱，完成账户设置：
+  </p>
+  <p style="font-size:34px;font-weight:700;letter-spacing:10px;margin:0 0 24px;color:#0f172a">{code}</p>
+  <p style="font-size:14px;line-height:1.6;color:#57534e;margin:0 0 8px">
+    验证码将在 {ttl} 分钟后失效，且仅可使用一次。
+  </p>
+  <p style="font-size:14px;line-height:1.6;color:#57534e;margin:0">
+    如果您没有注册 Auren 账户，请忽略此邮件。
+  </p>
+</div>
+""",
+}
+
+
+def signup_verification_code(*, display_name: str, code: str, language: str) -> tuple[str, str]:
+    """Returns (subject, html_body) for the signup email-verification code."""
+    lang = language if language in _VERIFY_BODY else "en"
+    body = _VERIFY_BODY[lang].format(
+        display_name=display_name, code=code, ttl=PASSWORD_RESET_CODE_TTL_MINUTES,
+    )
+    return _VERIFY_SUBJECT[lang], body
+
+
 def password_reset_code(*, display_name: str, code: str, language: str) -> tuple[str, str]:
     """Returns (subject, html_body). Falls back to English for any language
     that isn't `zh`, matching how `primary_language` is handled elsewhere."""

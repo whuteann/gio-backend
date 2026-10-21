@@ -27,6 +27,12 @@ class User(Base):
     timezone = Column(String, nullable=False, default="UTC")
     # Collected once at onboarding; outlives recalibration (see CorePersonality).
     birthdate = Column(Date, nullable=True)
+    # When the emailed signup code was accepted. Null = unverified, which
+    # gates login (auth.py re-sends a code rather than issuing tokens). A
+    # timestamp rather than a boolean so "when" is auditable; every account
+    # that predates this column was backfilled verified by migration
+    # e4a71c9b2d05 — only new signups start null.
+    email_verified_at = Column(DateTime(timezone=True), nullable=True)
     onboarding_completed_at = Column(DateTime(timezone=True), nullable=True)
     core_personality_last_recalibrated_at = Column(DateTime(timezone=True), nullable=True)
     last_login_at = Column(DateTime(timezone=True), nullable=True)
@@ -51,6 +57,12 @@ class User(Base):
     # /account-link/confirm and /account-link/unlink endpoints.
     linked_bracelet_user_id = Column(UUID(as_uuid=True), unique=True, nullable=True)
     linked_at = Column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def email_verified(self) -> bool:
+        """What UserOut exposes. Pydantic's from_attributes reads this, so
+        the frontend never has to interpret a nullable timestamp."""
+        return self.email_verified_at is not None
 
     subscription = relationship("Subscription", back_populates="user", uselist=False, cascade="all, delete-orphan")
     core_personality = relationship("CorePersonality", back_populates="user", uselist=False, cascade="all, delete-orphan")

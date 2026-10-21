@@ -9,6 +9,10 @@ from app.dependencies import get_db
 from app.models.user import User
 from app.schemas.auth import (
     ForgotPasswordRequest,
+    LoginUnverifiedResponse,
+    RegisterResponse,
+    ResendVerificationRequest,
+    VerifyEmailRequest,
     GenericDetailResponse,
     LoginRequest,
     OtpValidResponse,
@@ -19,15 +23,19 @@ from app.schemas.auth import (
     VerifyResetOtpRequest,
 )
 from app.services.account_link import notify_bracelet_backend_of_signup
-from app.services import password_reset
+from app.services import email_verification, otp as otp_service, password_reset
 from app.services.recommendation import warm_recommendation
 from app.services.auth import create_user, email_taken, normalize_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=RegisterResponse, status_code=status.HTTP_201_CREATED)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
+    """Creates the account and emails a verification code. Deliberately
+    issues NO session: tokens come from /auth/verify-email. An unverified
+    account therefore cannot call anything, rather than holding a valid JWT
+    while the gate is enforced only in the UI."""
     existing = db.query(User).filter(User.phone_number == payload.phone_number.strip()).first()
     if existing:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An account with this phone number already exists.")
@@ -46,14 +54,22 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     )
     db.commit()
     notify_bracelet_backend_of_signup(user)
-    return TokenResponse(access_token=create_access_token(str(user.id)), refresh_token=create_refresh_token(str(user.id)))
+    email_verification.send_code(db, user)
+    return RegisterResponse(email=user.email, detail=_GENERIC_CODE_SENT)
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=TokenResponse | LoginUnverifiedResponse)
 def login(payload: LoginRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.phone_number == payload.phone_number.strip()).first()
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid phone number or password.")
+    # An account that never verified gets a fresh code instead of a session,
+    # so a lost signup email is recoverable by simply logging in. Checked
+    # after the password, so this leaks nothing to someone guessing.
+    if user.email_verified_at is None:
+        email_verification.send_code(db, user)
+        return LoginUnverifiedResponse(email=user.email, detail=_GENERIC_CODE_SENT)
+
     user.last_login_at = datetime.now(timezone.utc)
     db.commit()
     # Warm today's recommendation so Colour Psychology is instant when they
@@ -121,3 +137,32 @@ def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db))
     exactly once."""
     if not password_reset.reset_password(db, payload.email, payload.otp, payload.new_password):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_GENERIC_BAD_CODE)
+
+
+# --- Signup email verification -------------------------------------------
+
+_GENERIC_CODE_SENT = "A verification code has been sent to your email."
+
+
+@router.post("/verify-email", response_model=TokenResponse)
+def verify_email(payload: VerifyEmailRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Exchanges a valid code for the account's first session. This is the
+    only place a newly registered user gets tokens."""
+    user = email_verification.verify(db, payload.email, payload.otp)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_GENERIC_BAD_CODE)
+    user.last_login_at = datetime.now(timezone.utc)
+    db.commit()
+    background_tasks.add_task(warm_recommendation, user.id)
+    return TokenResponse(access_token=create_access_token(str(user.id)), refresh_token=create_refresh_token(str(user.id)))
+
+
+@router.post("/resend-verification", response_model=GenericDetailResponse)
+def resend_verification(payload: ResendVerificationRequest, db: Session = Depends(get_db)):
+    """Always 200 with the same body — unknown address, already-verified
+    account and rate-limited account are indistinguishable, same reasoning
+    as /auth/forgot-password."""
+    user = otp_service.find_user_by_email(db, payload.email)
+    if user is not None and user.email_verified_at is None:
+        email_verification.send_code(db, user)
+    return GenericDetailResponse(detail=_GENERIC_CODE_SENT)

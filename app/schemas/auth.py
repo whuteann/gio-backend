@@ -12,9 +12,10 @@ class RegisterRequest(BaseModel):
     password: str
     display_name: str
     language: str = "en"
-    # Optional — no longer the login identity, kept only for Xendit
-    # checkout/invoicing (see app/models/user.py).
-    email: EmailStr | None = None
+    # Required, not optional: signup now emails a verification code, and an
+    # account created without an address could never be verified and so
+    # could never log in.
+    email: EmailStr
 
 
 class LoginRequest(BaseModel):
@@ -61,3 +62,31 @@ class GenericDetailResponse(BaseModel):
 
 class OtpValidResponse(BaseModel):
     valid: bool
+
+
+class VerifyEmailRequest(BaseModel):
+    email: EmailStr
+    otp: str = Field(pattern=_OTP_PATTERN)
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+
+class RegisterResponse(BaseModel):
+    """No tokens. Registration creates the account and emails a code; the
+    session is issued by /auth/verify-email once that code checks out."""
+
+    email: EmailStr
+    verification_required: bool = True
+    detail: str
+
+
+class LoginUnverifiedResponse(BaseModel):
+    """What /auth/login returns for a correct password on an account that
+    never verified. A fresh code has already been sent, so the client routes
+    to the same verify page a new signup lands on."""
+
+    email: EmailStr
+    verification_required: bool = True
+    detail: str

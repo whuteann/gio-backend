@@ -20,6 +20,9 @@ from app.core.security import create_access_token, create_refresh_token, verify_
 from app.dependencies import get_current_user, get_db
 from app.models.user import Subscription, User
 from app.schemas.account_link import (
+    AdminCreateUserRequest,
+    AdminDeleteUserResponse,
+    AdminUpdateUserRequest,
     AdminUserListItem,
     AdminUserListResponse,
     AuthenticateRequest,
@@ -38,8 +41,9 @@ from app.schemas.account_link import (
     UnlinkResponse,
 )
 from app.schemas.auth import TokenResponse
-from app.services.account_link import link_from_signup, strip_phone_number
-from app.services.auth import create_user
+from app.services.account_link import link_from_signup, notify_bracelet_backend_of_signup, strip_phone_number
+from app.services.auth import create_user, email_taken, normalize_email
+from app.services.subscription_payment import set_plan_admin
 
 logger = logging.getLogger(__name__)
 
@@ -248,6 +252,24 @@ def get_link_status(current_user: User = Depends(get_current_user)):
     return LinkStatusResponse(linked=True, bracelet_user_id=current_user.linked_bracelet_user_id)
 
 
+def _to_admin_item(u: User) -> AdminUserListItem:
+    return AdminUserListItem(
+        auren_user_id=u.id,
+        phone_number=u.phone_number,
+        display_name=u.display_name,
+        email=u.email,
+        created_at=u.created_at,
+        linked_bracelet_user_id=u.linked_bracelet_user_id,
+        last_login_at=u.last_login_at,
+        plan=u.subscription.plan if u.subscription else None,
+        subscription_status=u.subscription.status if u.subscription else None,
+        renews_at=u.subscription.renews_at if u.subscription else None,
+        trial_ends_at=u.subscription.trial_ends_at if u.subscription else None,
+        check_in_count_today=u.check_in_count_today,
+        inner_reading_count_today=u.inner_reading_count_today,
+    )
+
+
 @router.get("/admin/users", response_model=AdminUserListResponse)
 def list_users_for_admin(
     request: Request,
@@ -267,22 +289,93 @@ def list_users_for_admin(
     total = query.count()
     rows = query.offset((page - 1) * page_size).limit(page_size).all()
 
-    items = [
-        AdminUserListItem(
-            auren_user_id=u.id,
-            phone_number=u.phone_number,
-            display_name=u.display_name,
-            email=u.email,
-            created_at=u.created_at,
-            linked_bracelet_user_id=u.linked_bracelet_user_id,
-            last_login_at=u.last_login_at,
-            plan=u.subscription.plan if u.subscription else None,
-            subscription_status=u.subscription.status if u.subscription else None,
-            renews_at=u.subscription.renews_at if u.subscription else None,
-            trial_ends_at=u.subscription.trial_ends_at if u.subscription else None,
-            check_in_count_today=u.check_in_count_today,
-            inner_reading_count_today=u.inner_reading_count_today,
-        )
-        for u in rows
-    ]
+    items = [_to_admin_item(u) for u in rows]
     return AdminUserListResponse(items=items, total=total, page=page, page_size=page_size)
+
+
+@router.post("/admin/users", response_model=AdminUserListItem, status_code=status.HTTP_201_CREATED)
+def create_user_for_admin(payload: AdminCreateUserRequest, request: Request, db: Session = Depends(get_db)):
+    """Admin-created Auren account — bracelet-management-backend's Auren
+    Accounts "Create" action, service-key gated same as the listing above.
+    Sets email_verified_at immediately (the admin is vouching for the
+    address, same trust basis as creating the account at all) and stores
+    the admin-typed password directly — never echoed back by this or any
+    other endpoint afterward. See AUREN_ACCOUNTS_ADMIN_CRUD_PLAN.md §2.
+    """
+    _require_service_key(request)
+
+    phone = payload.phone_number.strip()
+    if db.query(User).filter(User.phone_number == phone).first():
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An account with this phone number already exists.")
+    email = normalize_email(payload.email)
+    if email_taken(db, email):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An account with this email address already exists.")
+
+    user = create_user(
+        db, phone_number=phone, password=payload.password,
+        display_name=payload.display_name, language="en", email=email,
+    )
+    user.email_verified_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(user)
+    notify_bracelet_backend_of_signup(user)
+    return _to_admin_item(user)
+
+
+@router.patch("/admin/users/{user_id}", response_model=AdminUserListItem)
+def update_user_for_admin(user_id: UUID, payload: AdminUpdateUserRequest, request: Request, db: Session = Depends(get_db)):
+    """Name/email/plan only — password is deliberately not editable here
+    (see plan doc §2/§3); the account holder changes their own via
+    /me/password."""
+    _require_service_key(request)
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Auren account not found.")
+
+    if payload.display_name is not None:
+        user.display_name = payload.display_name
+
+    if payload.email is not None:
+        email = normalize_email(payload.email)
+        if email_taken(db, email, exclude_user_id=user.id):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An account with this email address already exists.")
+        if email != user.email:
+            user.email = email
+            # The email on file is trusted because it was verified (or an
+            # admin vouched for it at creation) — changing it must not
+            # silently carry that trust over to an address nobody's
+            # confirmed. See plan doc §3.
+            user.email_verified_at = None
+
+    if payload.plan is not None:
+        if user.subscription is None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="This account has no subscription row to update.")
+        set_plan_admin(db, user, payload.plan, payload.billing_cycle)
+
+    db.commit()
+    db.refresh(user)
+    return _to_admin_item(user)
+
+
+@router.delete("/admin/users/{user_id}", response_model=AdminDeleteUserResponse)
+def delete_user_for_admin(user_id: UUID, request: Request, db: Session = Depends(get_db)):
+    """Hard delete — every child table already cascades at the DB level
+    (check-ins, readings, recommendations, core personality, narrative,
+    gamification, journal entries, subscription, password reset OTPs —
+    confirmed by reading every model, see plan doc §4). Reports
+    linked_bracelet_user_id back so the caller (bracelet-management-
+    backend) can clean up its own AurenAccountLink row — that one can't
+    cascade, it lives in a different database entirely."""
+    _require_service_key(request)
+    user = db.get(User, user_id)
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Auren account not found.")
+
+    bracelet_user_id = user.linked_bracelet_user_id
+    db.delete(user)
+    db.commit()
+    return AdminDeleteUserResponse(
+        deleted=True,
+        had_linked_bracelet_account=bracelet_user_id is not None,
+        bracelet_user_id=bracelet_user_id,
+    )

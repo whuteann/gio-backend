@@ -1,7 +1,8 @@
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class CheckPhoneRequest(BaseModel):
@@ -96,3 +97,35 @@ class SignInWithGioResponse(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
+
+
+# --- Admin CRUD for bangle-bazi-admin's Auren Accounts page (via
+# bracelet-management-backend) — see AUREN_ACCOUNTS_ADMIN_CRUD_PLAN.md ---
+
+
+class AdminCreateUserRequest(BaseModel):
+    display_name: str
+    phone_number: str = Field(pattern=r"^\d{8,15}$")
+    email: EmailStr
+    # Admin-typed, stored once at creation — never editable or returned by
+    # any endpoint afterward (see plan doc §2). Only the account holder can
+    # change it later, through the app's own /me/password.
+    password: str = Field(min_length=6)
+
+
+class AdminUpdateUserRequest(BaseModel):
+    display_name: str | None = None
+    email: EmailStr | None = None
+    plan: Literal["FREE", "PREMIUM"] | None = None
+    # Only consulted when plan == "PREMIUM"; defaults to MONTHLY server-side
+    # if omitted.
+    billing_cycle: Literal["MONTHLY", "YEARLY"] | None = None
+
+
+class AdminDeleteUserResponse(BaseModel):
+    deleted: bool
+    # Lets the caller (bracelet-management-backend) know whether it also
+    # needs to clean up its own AurenAccountLink row — that one can't
+    # cascade, it lives in a different database. See plan doc §4.
+    had_linked_bracelet_account: bool
+    bracelet_user_id: UUID | None = None

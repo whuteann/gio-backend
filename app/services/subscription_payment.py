@@ -136,6 +136,23 @@ def _apply_premium(db: Session, user: User, billing_cycle: str, now: datetime) -
     sub.cancelled_at = None
 
 
+def set_plan_admin(db: Session, user: User, plan: str, billing_cycle: str | None = None) -> None:
+    """Admin-driven plan change — bracelet-management-backend's Auren
+    Accounts Edit action (AUREN_ACCOUNTS_ADMIN_CRUD_PLAN.md §3). A direct
+    grant/revoke, not gated on a real payment, unlike every other caller of
+    _apply_premium. PREMIUM reuses that exact state transition; FREE is its
+    counterpart — nothing needed one before an admin toggle existed."""
+    now = datetime.now(timezone.utc)
+    if plan == "PREMIUM":
+        _apply_premium(db, user, billing_cycle or "MONTHLY", now)
+    else:
+        sub = user.subscription
+        sub.plan = "FREE"
+        sub.status = "ACTIVE"
+        sub.renews_at = None
+        sub.expires_at = None
+
+
 def handle_xendit_webhook(db: Session, payload: dict[str, Any], callback_token: str | None) -> dict:
     if not settings.xendit_webhook_token:
         logger.error("Xendit webhook received but XENDIT_WEBHOOK_TOKEN is not configured — refusing.")

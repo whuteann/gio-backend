@@ -339,13 +339,9 @@ def update_user_for_admin(user_id: UUID, payload: AdminUpdateUserRequest, reques
         email = normalize_email(payload.email)
         if email_taken(db, email, exclude_user_id=user.id):
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="An account with this email address already exists.")
-        if email != user.email:
-            user.email = email
-            # The email on file is trusted because it was verified (or an
-            # admin vouched for it at creation) — changing it must not
-            # silently carry that trust over to an address nobody's
-            # confirmed. See plan doc §3.
-            user.email_verified_at = None
+        # Admin edits are trusted outright, same basis as admin-created
+        # accounts (§2) — no re-verification requirement.
+        user.email = email
 
     if payload.plan is not None:
         if user.subscription is None:

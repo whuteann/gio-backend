@@ -43,11 +43,13 @@ def apply_reflection_side_effects(
     inner_reading_id: uuid.UUID | None = None,
     core_personality_id: uuid.UUID | None,
     personality_title: str | None,
-    # Each value is already a resolved {"en": ..., "zh": ...} pair — the
-    # caller shapes this (affirmation/insight/reflection_question come
-    # from the curated library, already bilingual; the other three are
-    # freely generated, English-only for now with "zh": None) — cascade.py
-    # no longer does that wrapping itself. See docs/behaviour_log_0011.md.
+    # Each value is already a resolved {"en": ..., "zh": ..., "ms": ...}
+    # mapping — the caller shapes this (affirmation/insight/
+    # reflection_question come from the curated library, which carries every
+    # language; the other three are freely generated as LocalizedText) —
+    # cascade.py no longer does that wrapping itself. Stored verbatim into
+    # the snapshot's JSONB columns, so a new language needs no change here.
+    # See docs/behaviour_log_0011.md.
     narrative_content: dict[str, dict] | None = None,
     # The three library ids actually selected this submission, if any —
     # recorded as permanent unlocks alongside badges below.

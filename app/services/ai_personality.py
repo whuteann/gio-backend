@@ -5,17 +5,16 @@ number is computed deterministically in app/services/numerology.py *before*
 this is ever called, and handed to the model as a fixed fact it's told not
 to recalculate. The model's only job is the narrative wrapped around those
 numbers. Unlike sample-logic.py's BilingualElementalCalculation, generation
-here is single-language per call — see docs behaviour log for why (dual-
-language is sequential: generate the requested language, return, generate
-the other one after, not both in one blocking call).
+here is single-language per call — see docs behaviour log for why (the
+languages are sequential: generate the requested one, return, generate the
+rest after, not all of them in one blocking call).
 """
 
 from openai import AsyncOpenAI
 
 from app.config import settings
 from app.schemas.ai_personality import CorePersonalityGeneration
-
-LANGUAGE_NAMES = {"en": "English", "zh": "Chinese (Simplified)"}
+from app.services import languages
 
 _client = AsyncOpenAI(api_key=settings.openai_api_key)
 
@@ -29,7 +28,10 @@ async def generate_core_personality_content(
     colour_weights: dict[str, int],
     language: str,
 ) -> CorePersonalityGeneration:
-    language_name = LANGUAGE_NAMES.get(language, "English")
+    # Via languages.py, not a local dict: the local one silently fell back
+    # to English for anything it didn't list, which meant a Malay request
+    # generated English prose and stored it in the "_ms" columns.
+    language_name = languages.language_name(language)
 
     system_message = (
         "You are a warm, insightful numerology and personality expert writing for a "

@@ -15,19 +15,31 @@ model *selects* an id from the curated library (content.py, see
 docs/behaviour_log_0011.md), grounded on the same inputs as before.
 current_focus/friendly_advice/reminder (and check-in's title/subtitle)
 stay freely generated, and are now genuinely bilingual — written directly
-in both languages in the same call, per
+in every supported language in the same call, per
 gio-member-app/docs/behaviour_log_0002.md — since their target columns
 (InnerStateSnapshot's JSONB fields) already support it.
 narrative_summary stays English-only deliberately: it's system memory
 (NarrativeEntry.summary), never shown to a user. Inner Reading's own
 record fields (narrative/title/subtitle/life_area_*) also stay
 English-only for now — `InnerReading`'s columns aren't migrated to the
-bilingual JSONB shape yet (behaviour_log_0002.md Phase E).
+multi-language JSONB shape yet (behaviour_log_0002.md Phase E).
 """
 
 from openai import AsyncOpenAI
 
 from app.config import settings
+from app.services import languages
+
+# Named, not coded, and derived from services/languages.SUPPORTED: a
+# prompt that hand-writes "English and Chinese" is a prompt that silently
+# stops matching the schema the day a third language is added.
+_LOCALIZED_FIELDS = (
+    "written in "
+    + ", ".join(f"{languages.language_name(c)} (`{c}`)" for c in languages.SUPPORTED[:-1])
+    + f" and {languages.language_name(languages.SUPPORTED[-1])} (`{languages.SUPPORTED[-1]}`)"
+    + " — genuine, natural phrasing in each, each written natively rather"
+    " than translated out of another"
+)
 from app.schemas.ai_outcome import (
     CheckInOutcomeGeneration,
     InnerReadingOutcomeGeneration,
@@ -114,9 +126,8 @@ Write the following:
 
 Output rules:
 - reminder, current_focus, friendly_advice, title, and subtitle are each
-  written in both English (`en`) and Chinese (`zh`) — genuine, natural
-  phrasing in each language, not a literal translation of one into the
-  other. narrative_summary is a single plain string, English only.
+  {_LOCALIZED_FIELDS}. narrative_summary is a single plain string,
+  English only.
 - Every free-text field is plain text (no markdown, no bullet points).
 - Keep each field genuinely short — this is a daily check-in, not an
   essay.
@@ -141,9 +152,10 @@ Output rules:
 # Reading's own record content (narrative/title/subtitle) and the 4
 # life-area fields, all in the one call rather than a second round trip.
 
-# Mirrors ai_personality.LANGUAGE_NAMES — the model is told the language by
-# name, not by code.
-READING_LANGUAGE_NAMES = {"en": "English", "zh": "Chinese (Simplified)"}
+# The model is told the language by name, not by code. Sourced from
+# services/languages.py so a new language is added in exactly one place —
+# this dict previously listed two, and a third would have been written into
+# the _ms column in English without any error.
 
 async def generate_reading_outcome(
     *,
@@ -158,7 +170,7 @@ async def generate_reading_outcome(
     else:
         memory_block = "(none yet — this is the first recorded check-in or reading for this user)"
 
-    language_name = READING_LANGUAGE_NAMES.get(language, "English")
+    language_name = languages.language_name(language)
 
     prompt = f"""\
 A user just completed an Inner Reading — a slower, more considered \
@@ -204,8 +216,7 @@ Write the following, in {language_name} unless noted otherwise:
 
 Output rules:
 - reminder, current_focus, and friendly_advice are each written in both
-  English (`en`) and Chinese (`zh`) — genuine, natural phrasing in each
-  language, not a literal translation of one into the other.
+  {_LOCALIZED_FIELDS}.
   narrative, title, subtitle and the 4 life_area_* fields are each a
   single plain string written in {language_name}. narrative_summary is
   the exception: always English, since it is never shown to the user and
@@ -245,13 +256,13 @@ async def generate_reading_secondary_language(
 
     Writes the same reading again rather than translating it word for word
     — the house convention everywhere else bilingual content is produced
-    (ai_personality, the BilingualText fields above). It is given the
+    (ai_personality, the LocalizedText fields above). It is given the
     already-written version so the two say the same thing about the same
     moment; without that the user would get two different readings
     depending on which language they happened to open.
     """
-    language_name = READING_LANGUAGE_NAMES.get(language, "English")
-    source_name = READING_LANGUAGE_NAMES.get(primary_language, "English")
+    language_name = languages.language_name(language)
+    source_name = languages.language_name(primary_language)
 
     life_area_block = "\n".join(f"- {k}: {v}" for k, v in primary_life_areas.items())
 

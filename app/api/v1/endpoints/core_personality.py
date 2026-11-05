@@ -9,6 +9,7 @@ from app.dependencies import get_current_user, get_db
 from app.models.personality import CorePersonality
 from app.models.user import User
 from app.schemas.core_personality import CalculateRequest, CorePersonalityResultOut
+from app.services import languages
 from app.services.ai_personality import generate_core_personality_content
 from app.services.numerology import (
     calculate_birthday_number,
@@ -19,13 +20,15 @@ from app.services.numerology import (
 
 router = APIRouter(prefix="/core-personality", tags=["core-personality"])
 
-_OTHER_LANGUAGE = {"en": "zh", "zh": "en"}
-
 
 async def _generate_secondary_language(core_personality_id: uuid.UUID, birthdate: str, language: str) -> None:
     """Runs after the response is sent (FastAPI BackgroundTasks) — its own
     short-lived DB session, since the request's session is already closed
-    by the time this runs."""
+    by the time this runs.
+
+    Queued once per language in languages.others(primary); FastAPI runs a
+    request's background tasks sequentially, so the passes never race over
+    languages_ready."""
     db = SessionLocal()
     try:
         personality = db.get(CorePersonality, core_personality_id)
@@ -54,7 +57,11 @@ async def _generate_secondary_language(core_personality_id: uuid.UUID, birthdate
         setattr(personality, f"life_path_number_points_{language}", [p.model_dump() for p in content.life_path_number_points])
         setattr(personality, f"talent_number_points_{language}", [p.model_dump() for p in content.talent_number_points])
         setattr(personality, f"summary_{language}", content.summary)
-        personality.generation_status = "READY"
+        # Two passes now, so "a pass finished" is not "the row is complete"
+        # — see languages.record_ready.
+        personality.languages_ready, personality.generation_status = languages.record_ready(
+            personality.languages_ready, language
+        )
         db.commit()
     finally:
         db.close()
@@ -81,7 +88,7 @@ async def calculate(
         response.status_code = status.HTTP_200_OK
         return existing
 
-    language = payload.language if payload.language in ("en", "zh") else "en"
+    language = languages.normalize(payload.language)
 
     birthday_number = calculate_birthday_number(payload.date_of_birth)
     life_path_number = calculate_life_path_number(payload.date_of_birth)
@@ -102,6 +109,7 @@ async def calculate(
         user_id=user.id,
         primary_language=language,
         generation_status="PARTIAL",
+        languages_ready=[language],
         birthday_number=birthday_number,
         life_path_number=life_path_number,
         talent_number=talent_number,
@@ -130,9 +138,11 @@ async def calculate(
     db.commit()
     db.refresh(personality)
 
-    background_tasks.add_task(
-        _generate_secondary_language, personality.id, payload.date_of_birth, _OTHER_LANGUAGE[language]
-    )
+    # Two passes now, not one — see services/languages.others().
+    for other in languages.others(language):
+        background_tasks.add_task(
+            _generate_secondary_language, personality.id, payload.date_of_birth, other
+        )
 
     return personality
 

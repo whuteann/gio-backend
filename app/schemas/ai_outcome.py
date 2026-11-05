@@ -2,7 +2,7 @@ from enum import Enum
 
 from pydantic import BaseModel
 
-from app.schemas.common import BilingualText
+from app.schemas.common import LocalizedText
 from app.services.content import AFFIRMATIONS, INSIGHTS, REFLECTION_QUESTIONS
 
 # Dynamic enums built from the curated library (content.py) — see
@@ -24,20 +24,20 @@ class CheckInOutcomeGeneration(BaseModel):
     gio-member-app/docs/behaviour_log_0002.md. `narrative_summary` is NOT
     user-facing (it becomes the new NarrativeEntry's summary, English-only
     since it's just system memory, never shown to the user) — every other
-    freely-generated field is genuinely bilingual, written directly in
-    both languages rather than translated after the fact. `title`/
+    freely-generated field is written directly in every supported
+    language rather than translated after the fact. `title`/
     `subtitle` are new (docs/behaviour_log_0011.md), parity with Inner
     Reading's own."""
 
     insight_id: InsightId
     reflection_question_id: ReflectionQuestionId
-    reminder: BilingualText
-    current_focus: BilingualText
-    friendly_advice: BilingualText
+    reminder: LocalizedText
+    current_focus: LocalizedText
+    friendly_advice: LocalizedText
     affirmation_id: AffirmationId
     narrative_summary: str
-    title: BilingualText
-    subtitle: BilingualText
+    title: LocalizedText
+    subtitle: LocalizedText
 
 
 class InnerReadingOutcomeGeneration(BaseModel):
@@ -45,28 +45,29 @@ class InnerReadingOutcomeGeneration(BaseModel):
     docs/behaviour_log_0007.md Phase 4, docs/behaviour_log_0011.md, and
     gio-member-app/docs/behaviour_log_0002.md. Carries the same shared
     fields as CheckInOutcomeGeneration (these become InnerStateSnapshot's
-    six JSONB fields via the shared cascade) — bilingual, since that
-    target column is already JSONB regardless of trigger source — plus
+    six JSONB fields via the shared cascade) — all languages at once, since
+    that target column is already JSONB regardless of trigger source — plus
     Inner Reading's own record-level content (narrative/title/subtitle)
     and the 4 life-area breakdown fields. Those seven are written in one
-    language per call — the heaviest content in the app, so doubling it on
-    the blocking call is what Core Personality avoided — and the other
-    language follows from a BackgroundTask into the `_zh` columns added in
-    migration c7f2b9a04d31."""
+    language per call — the heaviest content in the app, so multiplying it on
+    the blocking call is what Core Personality avoided — and the remaining
+    languages follow from one BackgroundTask each, into the `_zh` columns
+    (migration c7f2b9a04d31) and `_ms` (migration b8d4f1a6c307)."""
 
-    # Shared with check-in — bilingual, feeds InnerStateSnapshot's JSONB columns.
+    # Shared with check-in — every language at once, feeds
+    # InnerStateSnapshot's JSONB columns.
     insight_id: InsightId
     reflection_question_id: ReflectionQuestionId
-    reminder: BilingualText
-    current_focus: BilingualText
-    friendly_advice: BilingualText
+    reminder: LocalizedText
+    current_focus: LocalizedText
+    friendly_advice: LocalizedText
     affirmation_id: AffirmationId
     narrative_summary: str
 
     # Inner Reading's own record content, written in the language the user
     # asked for (see ai_outcome.generate_reading_outcome's `language`). The
-    # other language is filled in afterwards by a BackgroundTask using
-    # InnerReadingSecondaryLanguageGeneration below.
+    # other languages are filled in afterwards, one BackgroundTask each,
+    # using InnerReadingSecondaryLanguageGeneration below.
     narrative: str
     title: str
     subtitle: str
@@ -79,14 +80,15 @@ class InnerReadingOutcomeGeneration(BaseModel):
 
 
 class InnerReadingSecondaryLanguageGeneration(BaseModel):
-    """The second-language pass over a reading that already exists — only
+    """One follow-up language pass over a reading that already exists — only
     the seven fields InnerReadingOutcomeGeneration writes in one language.
+    Runs once per language in services/languages.others(primary).
 
     Deliberately excludes the id-selection fields (insight/reflection/
-    affirmation) and the BilingualText ones: those were already decided and
-    already written in both languages on the first call, and re-deciding
-    them here would make the two language versions of the same reading
-    disagree about which insight the user was given.
+    affirmation) and the LocalizedText ones: those were already decided and
+    already written in every language on the first call, and re-deciding
+    them here would make the language versions of the same reading disagree
+    about which insight the user was given.
     """
 
     narrative: str

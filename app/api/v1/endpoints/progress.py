@@ -56,7 +56,7 @@ def get_unlocked_content(user: User = Depends(get_current_user), db: Session = D
         return [
             UnlockedItemOut(
                 item_id=r["item_id"], unlocked=r["unlocked"],
-                text_en=r["text_en"], text_zh=r["text_zh"],
+                text_en=r["text_en"], text_zh=r["text_zh"], text_ms=r["text_ms"],
                 unlocked_at=r["unlocked_at"].isoformat() if r["unlocked_at"] else None,
             )
             for r in rows

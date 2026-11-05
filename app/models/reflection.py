@@ -77,8 +77,10 @@ class CheckInSession(Base):
     # (scoring.py::checkin_category_and_emoji), no column needed.
     title = Column(String, nullable=True)
     title_zh = Column(String, nullable=True)
+    title_ms = Column(String, nullable=True)
     subtitle = Column(String, nullable=True)
     subtitle_zh = Column(String, nullable=True)
+    subtitle_ms = Column(String, nullable=True)
     # The NarrativeEntry generated for this check-in (see
     # docs/behaviour_log_0006.md) — SET NULL, not CASCADE, so deleting a
     # narrative entry never takes the check-in it came from down with it.
@@ -120,7 +122,7 @@ class InnerReading(Base):
     grounding = Column(SmallInteger, nullable=True)
     # Bilingual, following CheckInSession above: the unsuffixed column holds
     # English, `_zh` the Chinese. Unlike check-in — whose copy is short
-    # enough to generate in both languages in one call — a reading's body is
+    # enough to generate in every language in one call — a reading's body is
     # the heaviest generation in the app, so it uses Core Personality's
     # two-phase shape instead: the language the user asked for is written
     # synchronously, the other arrives from a BackgroundTask (see
@@ -128,28 +130,40 @@ class InnerReading(Base):
     # `generation_status` to READY.
     result_summary = Column(String, nullable=True)
     result_summary_zh = Column(String, nullable=True)
+    result_summary_ms = Column(String, nullable=True)
     narrative = Column(String, nullable=True)
     narrative_zh = Column(String, nullable=True)
+    narrative_ms = Column(String, nullable=True)
     insight = Column(String, nullable=True)
     insight_zh = Column(String, nullable=True)
+    insight_ms = Column(String, nullable=True)
     reflection_question = Column(String, nullable=True)
     reflection_question_zh = Column(String, nullable=True)
+    reflection_question_ms = Column(String, nullable=True)
     title = Column(String, nullable=True)
     title_zh = Column(String, nullable=True)
+    title_ms = Column(String, nullable=True)
     subtitle = Column(String, nullable=True)
     subtitle_zh = Column(String, nullable=True)
+    subtitle_ms = Column(String, nullable=True)
     # The AI's own phrasing of the user's ongoing journey, e.g. "Releasing
     # pressure". Already generated bilingually for InnerStateSnapshot; kept
     # on the reading too so the result page can show it without a second
     # fetch of the snapshot.
     current_focus = Column(String, nullable=True)
     current_focus_zh = Column(String, nullable=True)
+    current_focus_ms = Column(String, nullable=True)
     # "en" | "zh" — which language was generated synchronously, i.e. the one
     # the user saw immediately.
     primary_language = Column(String, nullable=True)
-    # PARTIAL until the second language lands, then READY. Same meaning as
-    # CorePersonality.generation_status.
+    # PARTIAL until every supported language is present, then READY. With
+    # three languages a two-state flag can no longer say *which* are done,
+    # so `languages_ready` carries the detail and this stays as the simple
+    # "is it complete" answer.
     generation_status = Column(String, nullable=False, default="PARTIAL")
+    # e.g. ["en", "ms"] — a client uses this to tell "still generating"
+    # from "failed and never coming".
+    languages_ready = Column(JSONB, nullable=True)
     # AI-generated per reading (docs/behaviour_log_0007.md), replacing the
     # old static content.py::LIFE_AREA_INSIGHTS lookup-by-focus-key.
     # {"work": ..., "relationships": ..., "personal_growth": ...,
@@ -157,6 +171,7 @@ class InnerReading(Base):
     # happens at read time (scoring.py::reading_content_for_plan), not here.
     life_area_insights = Column(JSONB, nullable=True)
     life_area_insights_zh = Column(JSONB, nullable=True)
+    life_area_insights_ms = Column(JSONB, nullable=True)
     narrative_entry_id = Column(UUID(as_uuid=True), ForeignKey("narrative_entries.id", ondelete="SET NULL"), nullable=True)
     started_at = Column(DateTime(timezone=True), nullable=False)
     completed_at = Column(DateTime(timezone=True), nullable=True)
@@ -201,7 +216,8 @@ class InnerStateSnapshot(Base):
     colour_key = Column(String, nullable=True)  # current Colour Recommendation, denormalized — a lookup key, not text
 
     # The six narrative fields — bilingual, one JSONB column per field
-    # (e.g. {"en": "...", "zh": "..."}) rather than an _en/_zh String pair,
+    # (e.g. {"en": "...", "zh": "...", "ms": "..."}) rather than one String
+    # column per language,
     # per docs/behaviour_log_0006.md. Generated per check-in/reading from
     # the AI outcome step (Phase 4), grounded on the user's recent
     # NarrativeEntry history.
@@ -216,6 +232,7 @@ class InnerStateSnapshot(Base):
     # Not part of the six fields above, stays a plain bilingual String pair.
     summary_en = Column(String, nullable=True)
     summary_zh = Column(String, nullable=True)
+    summary_ms = Column(String, nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
 

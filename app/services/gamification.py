@@ -186,10 +186,14 @@ def get_unlocked_content(db: Session, user_id) -> dict[str, list[dict]]:
             if unlocked_at is not None:
                 items.append({
                     "item_id": item_id, "unlocked": True,
-                    "text_en": text["en"], "text_zh": text["zh"], "unlocked_at": unlocked_at,
+                    "text_en": text["en"], "text_zh": text["zh"], "text_ms": text["ms"],
+                    "unlocked_at": unlocked_at,
                 })
             else:
-                items.append({"item_id": item_id, "unlocked": False, "text_en": None, "text_zh": None, "unlocked_at": None})
+                items.append({
+                    "item_id": item_id, "unlocked": False,
+                    "text_en": None, "text_zh": None, "text_ms": None, "unlocked_at": None,
+                })
         return items
 
     return {

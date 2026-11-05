@@ -3,11 +3,14 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict
 
+from app.services import languages
+
 
 class QuestionOut(BaseModel):
     dimension: str
     text: str
     text_zh: str | None = None
+    text_ms: str | None = None
 
 
 class QuestionSetOut(BaseModel):
@@ -74,8 +77,10 @@ class CheckInSessionOut(BaseModel):
     # since gio-member-app/docs/behaviour_log_0002.md Phase D.
     title: str | None = None
     title_zh: str | None = None
+    title_ms: str | None = None
     subtitle: str | None = None
     subtitle_zh: str | None = None
+    subtitle_ms: str | None = None
     # Listing metadata (category chip + avatar emoji) — always present,
     # deterministic, computed at serialization time
     # (scoring.py::checkin_category_and_emoji), not stored columns —
@@ -101,24 +106,37 @@ class InnerReadingOut(BaseModel):
     grounding: int | None
     result_summary: str | None
     result_summary_zh: str | None = None
+    result_summary_ms: str | None = None
     narrative: str | None
     narrative_zh: str | None = None
+    narrative_ms: str | None = None
     insight: str | None
     insight_zh: str | None = None
+    insight_ms: str | None = None
     reflection_question: str | None
     reflection_question_zh: str | None = None
+    reflection_question_ms: str | None = None
     title: str | None
     title_zh: str | None = None
+    title_ms: str | None = None
     subtitle: str | None
     subtitle_zh: str | None = None
+    subtitle_ms: str | None = None
     current_focus: str | None = None
     current_focus_zh: str | None = None
+    current_focus_ms: str | None = None
     life_area_insights: dict[str, str] | None = None
     life_area_insights_zh: dict[str, str] | None = None
+    life_area_insights_ms: dict[str, str] | None = None
     # "en" | "zh" — which language was written synchronously. PARTIAL until
     # the other one lands, then READY (same meaning as CorePersonality's).
     primary_language: str | None = None
     generation_status: str = "PARTIAL"
+    # Which languages the heavy body actually has. generation_status alone
+    # can't distinguish "Malay still generating" from "Malay failed and is
+    # never coming", which is the difference between showing a spinner and
+    # showing the English fallback.
+    languages_ready: list[str] | None = None
     is_premium_content: bool = False
     # Listing metadata (category chip + avatar emoji) — always present,
     # never gated, deterministic from the reading's own dims
@@ -151,38 +169,47 @@ class InnerStateSnapshotOut(BaseModel):
     inner_pressure_delta: int = 0
     grounding_delta: int = 0
     colour_key: str | None
-    # The six narrative fields — each stored as one JSONB {"en", "zh"} column
-    # on the model (see docs/behaviour_log_0006.md Phase 4), flattened here
-    # into _en/_zh pairs to match this app's existing bilingual convention
+    # The six narrative fields — each stored as one JSONB
+    # {"en", "zh", "ms"} column on the model (see
+    # docs/behaviour_log_0006.md Phase 4), flattened here into one field
+    # per language to match this app's existing convention
     # (app/schemas/core_personality.py). Null on snapshots that predate
     # Phase 4, or that came from Inner Reading (still demo/deterministic,
     # no AI outcome generation yet).
     insight_en: str | None
     insight_zh: str | None
+    insight_ms: str | None
     reflection_question_en: str | None
     reflection_question_zh: str | None
+    reflection_question_ms: str | None
     reminder_en: str | None
     reminder_zh: str | None
+    reminder_ms: str | None
     current_focus_en: str | None
     current_focus_zh: str | None
+    current_focus_ms: str | None
     friendly_advice_en: str | None
     friendly_advice_zh: str | None
+    friendly_advice_ms: str | None
     affirmation_en: str | None
     affirmation_zh: str | None
+    affirmation_ms: str | None
     created_at: datetime
 
     @classmethod
     def from_model(cls, snapshot, previous=None) -> "InnerStateSnapshotOut":
-        def bi(field: str) -> tuple[str | None, str | None]:
+        def loc(field: str) -> dict[str, str | None]:
+            """One JSONB column -> {"<field>_en": ..., "<field>_zh": ...}
+            for every supported language. Driven by languages.SUPPORTED
+            rather than a fixed tuple, so the six fields never have to be
+            re-listed by hand again."""
             value = getattr(snapshot, field) or {}
-            return value.get("en"), value.get("zh")
+            return {f"{field}_{code}": value.get(code) for code in languages.SUPPORTED}
 
-        insight_en, insight_zh = bi("insight")
-        reflection_question_en, reflection_question_zh = bi("reflection_question")
-        reminder_en, reminder_zh = bi("reminder")
-        current_focus_en, current_focus_zh = bi("current_focus")
-        friendly_advice_en, friendly_advice_zh = bi("friendly_advice")
-        affirmation_en, affirmation_zh = bi("affirmation")
+        narrative_fields: dict[str, str | None] = {}
+        for field in ("insight", "reflection_question", "reminder",
+                      "current_focus", "friendly_advice", "affirmation"):
+            narrative_fields.update(loc(field))
 
         return cls(
             id=snapshot.id, source_type=snapshot.source_type,
@@ -194,12 +221,7 @@ class InnerStateSnapshotOut(BaseModel):
             inner_pressure_delta=snapshot.inner_pressure - previous.inner_pressure if previous else 0,
             grounding_delta=snapshot.grounding - previous.grounding if previous else 0,
             colour_key=snapshot.colour_key,
-            insight_en=insight_en, insight_zh=insight_zh,
-            reflection_question_en=reflection_question_en, reflection_question_zh=reflection_question_zh,
-            reminder_en=reminder_en, reminder_zh=reminder_zh,
-            current_focus_en=current_focus_en, current_focus_zh=current_focus_zh,
-            friendly_advice_en=friendly_advice_en, friendly_advice_zh=friendly_advice_zh,
-            affirmation_en=affirmation_en, affirmation_zh=affirmation_zh,
+            **narrative_fields,
             created_at=snapshot.created_at,
         )
 

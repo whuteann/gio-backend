@@ -41,6 +41,7 @@ from openai import AsyncOpenAI
 from pydantic import BaseModel, create_model
 
 from app.config import settings
+from app.services import languages
 
 _client = AsyncOpenAI(api_key=settings.openai_api_key)
 
@@ -55,7 +56,35 @@ _SYSTEM_MESSAGE = (
     "You must strictly follow the required JSON structure."
 )
 
-_EMPTY_RESULT = {"letter_en": "", "letter_zh": "", "feature": None, "others": [], "phone_case": []}
+# One `reason_<code>` / `letter_<code>` field per supported language,
+# derived rather than listed: these used to be hardcoded _en/_zh pairs in
+# four places, which is how Malay would have been forgotten in one of them.
+_REASON_FIELDS = {f"reason_{code}": (str, ...) for code in languages.SUPPORTED}
+_LETTER_FIELDS = {f"letter_{code}": (str, ...) for code in languages.SUPPORTED}
+_LETTER_KEYS = tuple(_LETTER_FIELDS)
+
+# Prompt fragments naming those fields. Module-level, not per-call: they
+# depend only on languages.SUPPORTED, and `case_block` below is built
+# before the main prompt, so a local would be referenced before assignment.
+_REASON_FIELD_LIST = " / ".join(f"`{name}`" for name in _REASON_FIELDS)
+_LETTER_FIELD_LIST = " / ".join(f"`{name}`" for name in _LETTER_KEYS)
+# Spelled out rather than left implicit: the model has to be told which
+# code means which language, or `reason_ms` is a guess.
+_LANGUAGE_LEGEND = "Language codes: " + ", ".join(
+    f"`{code}` = {languages.language_name(code)}" for code in languages.SUPPORTED
+) + "."
+
+
+def _reasons(pick) -> dict[str, str]:
+    """The pick's per-language reasons, as the keys recommendation.py and
+    RecommendationItem expect."""
+    return {name: getattr(pick, name) for name in _REASON_FIELDS}
+
+
+_EMPTY_RESULT = {
+    **{key: "" for key in _LETTER_KEYS},
+    "feature": None, "others": [], "phone_case": [],
+}
 
 
 def _keyed(candidates: list[dict], prefix: str) -> dict[str, dict]:
@@ -67,8 +96,7 @@ def _stone_pick_model(name: str, key_enum: type[Enum]) -> type[BaseModel]:
         name,
         product_key=(key_enum, ...),
         material_tag=(str, ...),
-        reason_en=(str, ...),
-        reason_zh=(str, ...),
+        **_REASON_FIELDS,
     )
 
 
@@ -80,8 +108,7 @@ def _build_schema(
     the caller can tag results with the right `stone_type` afterwards."""
     FeatureKey = Enum("FeatureKey", {k: k for k in feature_keyed})
     fields: dict[str, tuple] = {
-        "letter_en": (str, ...),
-        "letter_zh": (str, ...),
+        **_LETTER_FIELDS,
         "feature_pick": (_stone_pick_model("FeaturePick", FeatureKey), ...),
     }
 
@@ -107,8 +134,7 @@ def _build_schema(
         CasePick = create_model(
             "PhoneCasePick",
             case_key=(CaseKey, ...),
-            reason_en=(str, ...),
-            reason_zh=(str, ...),
+            **_REASON_FIELDS,
         )
         fields["primary_case_pick"] = (CasePick, ...)
         # A second pick only makes sense with a second distinct candidate.
@@ -186,9 +212,9 @@ line — not stones, don't connect them to the material affinity above):
 
 Pick exactly 1 of these as `primary_case_pick` — never skip this, there \
 is always at least one worth recommending.{secondary_line} \
-`reason_en`/`reason_zh`: 1-2 sentences, same letter voice as above, brief \
-— this is its own small gift, not a stone, so don't force a tie to the \
-material affinity above."""
+{_REASON_FIELD_LIST}: 1-2 sentences each, same letter voice as above, \
+brief — this is its own small gift, not a stone, so don't force a tie to \
+the material affinity above."""
 
     prompt = f"""\
 {narrative_prompt}
@@ -211,18 +237,18 @@ types below, each independent of the feature pick and of each other:
 {secondary_block}
 
 For `feature_pick` and every secondary pick:
-- `reason_en` / `reason_zh`: 2-3 sentences, as if lifted from the middle \
+- {_REASON_FIELD_LIST}: 2-3 sentences each, as if lifted from the middle \
 of a personal letter — sincere and tender, carrying real feeling rather \
 than describing the product. Not marketing copy, not clinical, no bullet \
 points. Ground it in the inner state and recent reflections above. Write \
-genuinely in each language — not a literal translation of one into the \
-other.
+genuinely in each language — each one written natively, not a literal \
+translation of another. {_LANGUAGE_LEGEND}
 - `material_tag`: the stone/material name only, concise (1-4 words), \
 cleanly cased (e.g. "Moss Agate", "Red Phantom Quartz") — drawn from the \
 candidate's name above. English only, no bilingual pair needed.
 
-`letter_en` / `letter_zh`: write ONE unifying letter, 3-5 sentences, \
-tying together this person's current focus ("{focus_label}"), their \
+{_LETTER_FIELD_LIST}: write ONE unifying letter in each language, 3-5 \
+sentences, tying together this person's current focus ("{focus_label}"), their \
 state, and why the feature pick in particular fits this moment — the \
 single piece of writing this whole recommendation is built around, not a \
 fragment or a summary of the picks above.
@@ -243,7 +269,7 @@ fragment or a summary of the picks above.
     def _to_item(pick, keyed: dict, stone_type: str) -> dict:
         product = keyed[pick.product_key.value]
         return {
-            **product, "reason_en": pick.reason_en, "reason_zh": pick.reason_zh,
+            **product, **_reasons(pick),
             "material_tag": pick.material_tag, "stone_type": stone_type,
         }
 
@@ -261,18 +287,15 @@ fragment or a summary of the picks above.
         # Mandatory — guaranteed non-null by the schema (required single
         # field) whenever case_keyed is non-empty, see _build_schema.
         primary_product = case_keyed[primary_case_pick.case_key.value]
-        phone_case.append({**primary_product, "reason_en": primary_case_pick.reason_en, "reason_zh": primary_case_pick.reason_zh})
+        phone_case.append({**primary_product, **_reasons(primary_case_pick)})
 
         secondary_case_pick = getattr(parsed, "secondary_case_pick", None)
         if secondary_case_pick and secondary_case_pick.case_key.value != primary_case_pick.case_key.value:
             secondary_product = case_keyed[secondary_case_pick.case_key.value]
-            phone_case.append({
-                **secondary_product, "reason_en": secondary_case_pick.reason_en, "reason_zh": secondary_case_pick.reason_zh,
-            })
+            phone_case.append({**secondary_product, **_reasons(secondary_case_pick)})
 
     return {
-        "letter_en": parsed.letter_en,
-        "letter_zh": parsed.letter_zh,
+        **{key: getattr(parsed, key) for key in _LETTER_KEYS},
         "feature": feature,
         "others": others,
         "phone_case": phone_case,

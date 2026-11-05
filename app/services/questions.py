@@ -53,7 +53,12 @@ async def get_or_generate_checkin_question_set(db: Session, on_date: date_type, 
         return existing
     generation = await ai_questions.generate_checkin_questions()
     questions = [
-        {"dimension": key, "text": getattr(generation, key).en, "text_zh": getattr(generation, key).zh}
+        {
+            "dimension": key,
+            "text": getattr(generation, key).en,
+            "text_zh": getattr(generation, key).zh,
+            "text_ms": getattr(generation, key).ms,
+        }
         for key in DIMENSION_KEYS
     ]
     question_set = CheckInQuestionSet(
@@ -74,6 +79,7 @@ async def get_or_generate_reading_question_set(db: Session, on_date: date_type, 
             "dimension": key,
             "text": getattr(generation, f"{key}_{n}").en,
             "text_zh": getattr(generation, f"{key}_{n}").zh,
+            "text_ms": getattr(generation, f"{key}_{n}").ms,
         }
         for key in DIMENSION_KEYS
         for n in (1, 2)

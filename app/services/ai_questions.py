@@ -8,8 +8,8 @@ only the fixed `dimension` key each question is generated under, exactly
 per docs/behaviour_log_0006.md's "AI is responsible for question
 generation ONLY."
 
-Bilingual since gio-member-app/docs/behaviour_log_0002.md: each question
-comes back written in both English and Chinese in the same call (not a
+Multilingual since gio-member-app/docs/behaviour_log_0002.md: each question
+comes back written in every supported language in the same call (not a
 translation of one into the other), so the one shared/cached set still
 serves every user regardless of their language — no extra generation
 cost, just a slightly larger response.
@@ -19,6 +19,16 @@ from openai import AsyncOpenAI
 
 from app.config import settings
 from app.schemas.ai_questions import CheckInQuestionSetGeneration, InnerReadingQuestionSetGeneration
+from app.services import languages
+
+# Named, not coded: "write this in `ms`" is a guess the model should not
+# have to make. Derived from services/languages.SUPPORTED, so adding a
+# language updates every prompt in this module at once.
+_LANGUAGE_FIELDS = (
+    "in "
+    + ", ".join(f"{languages.language_name(c)} (`{c}`)" for c in languages.SUPPORTED[:-1])
+    + f" and {languages.language_name(languages.SUPPORTED[-1])} (`{languages.SUPPORTED[-1]}`)"
+)
 
 _client = AsyncOpenAI(api_key=settings.openai_api_key)
 
@@ -28,7 +38,7 @@ _SYSTEM_MESSAGE = (
     "You must strictly follow the required JSON structure."
 )
 
-_PROMPT = """\
+_PROMPT = f"""\
 Generate a set of 4 short, direct questions that ask how the user feels \
 right now, one per pillar below, in order. Each expects a 1-5 self-rating \
 as its answer.
@@ -54,7 +64,7 @@ VOICE & CRAFT:
 questions and across calls — a user should recognize the shape of these \
 questions each time, not be surprised by them. Do not strain for a fresh \
 angle or a clever turn of phrase.
-- Plain and natural in both English and Chinese — not a literal, \
+- Plain and natural in every language asked for — not a literal, \
 word-for-word translation of one into the other, but the same plain, \
 direct register in each.
 - No invented situations, no metaphor, no imagery, no scene-setting. Ask \
@@ -70,7 +80,7 @@ not mention the number scale explicitly, the UI shows the 1-5 scale \
 separately.
 - Do not ask about any pillar other than the one named for that field.
 - Plain text only, no markdown, no numbering, no emoji.
-- Write each question in both English (`en`) and Chinese (`zh`).
+- Write each question {_LANGUAGE_FIELDS}.
 """
 
 
@@ -104,7 +114,7 @@ _READING_SYSTEM_MESSAGE = (
     "You must strictly follow the required JSON structure."
 )
 
-_READING_PROMPT = """\
+_READING_PROMPT = f"""\
 Generate a set of 8 short, direct questions (2 per pillar) for a deeper \
 reflective practice called an "Inner Reading". Evaluate the user's \
 current state across these 4 pillars, in order. Each question expects a \
@@ -130,7 +140,7 @@ VOICE & CRAFT:
 questions and across calls — a user should recognize the shape of these \
 questions each time, not be surprised by them. Do not strain for a fresh \
 angle, a clever turn of phrase, or a new metaphor.
-- Plain and natural in both English and Chinese — not a literal, \
+- Plain and natural in every language asked for — not a literal, \
 word-for-word translation of one into the other, but the same plain, \
 direct register in each.
 - No invented situations, no metaphor or imagery (no compass, current, \
@@ -146,7 +156,7 @@ pillar's named spectrum — do not mention the number scale explicitly, \
 the UI shows the 1-5 scale separately.
 - Do not ask about any pillar other than the one named for that field.
 - Plain text only, no markdown, no numbering, no emoji.
-- Write each question in both English (`en`) and Chinese (`zh`).
+- Write each question {_LANGUAGE_FIELDS}.
 """
 
 

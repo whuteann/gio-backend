@@ -26,10 +26,13 @@ class CorePersonality(Base):
     # reasoning already applied to colour_key on InnerStateSnapshot.
     title_en = Column(String, nullable=True)  # e.g. "The Open Horizon"
     title_zh = Column(String, nullable=True)
+    title_ms = Column(String, nullable=True)
     subtitle_en = Column(String, nullable=True)
     subtitle_zh = Column(String, nullable=True)
+    subtitle_ms = Column(String, nullable=True)
     overview_en = Column(String, nullable=True)
     overview_zh = Column(String, nullable=True)
+    overview_ms = Column(String, nullable=True)
 
     # Numbers themselves are language-neutral — only their narrative content
     # is bilingual. Each *_points_{en,zh} column holds a JSON array of
@@ -40,10 +43,12 @@ class CorePersonality(Base):
     birthday_number = Column(Integer, nullable=True)
     birthday_number_points_en = Column(JSONB, nullable=True)
     birthday_number_points_zh = Column(JSONB, nullable=True)
+    birthday_number_points_ms = Column(JSONB, nullable=True)
 
     life_path_number = Column(Integer, nullable=True)
     life_path_number_points_en = Column(JSONB, nullable=True)
     life_path_number_points_zh = Column(JSONB, nullable=True)
+    life_path_number_points_ms = Column(JSONB, nullable=True)
 
     # String, not Integer: a richer numerology implementation formats this
     # "XX/N" (e.g. "38/2"), a compound value an Integer column can't hold.
@@ -51,6 +56,7 @@ class CorePersonality(Base):
     talent_number = Column(String, nullable=True)
     talent_number_points_en = Column(JSONB, nullable=True)
     talent_number_points_zh = Column(JSONB, nullable=True)
+    talent_number_points_ms = Column(JSONB, nullable=True)
 
     # One column per app/services/content.py::COLOUR_ORDER key — numeric
     # scores, not text, so no language split needed.
@@ -64,13 +70,17 @@ class CorePersonality(Base):
     # user-facing copy (that's title/subtitle/overview/the *_content fields).
     summary_en = Column(String, nullable=True)
     summary_zh = Column(String, nullable=True)
+    summary_ms = Column(String, nullable=True)
 
-    # Bookkeeping for the sequential dual-language generation flow (see
+    # Bookkeeping for the sequential multi-language generation flow (see
     # docs/behaviour_log_0004.md): POST /calculate generates and persists
-    # `primary_language` synchronously, then generates the other language
-    # in the background and flips this to READY.
-    primary_language = Column(String, nullable=True)  # "en" | "zh"
+    # `primary_language` synchronously, then generates each remaining
+    # language in the background, flipping this to READY once all are in.
+    primary_language = Column(String, nullable=True)  # services/languages.SUPPORTED
     generation_status = Column(String, nullable=False, default="PARTIAL")  # PARTIAL | READY
+    # Which languages actually have content — PARTIAL/READY alone cannot
+    # distinguish "Malay pending" from "Malay failed" once there are three.
+    languages_ready = Column(JSONB, nullable=True)
 
     generated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 

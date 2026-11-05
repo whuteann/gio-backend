@@ -22,29 +22,34 @@ DIMENSION_KEYS = [d["key"] for d in DIMENSIONS]
 # current_focus_zh/summary_zh (docs/behaviour_log_0012.md).
 FOCUS_COPY = {
     "emotional_energy": {
-        "focus": "Rebuilding energy", "focus_zh": "重建能量",
+        "focus": "Rebuilding energy", "focus_zh": "重建能量", "focus_ms": "Membina semula tenaga",
         "summary": "Your reserves are running low — small, gentle recharge matters most right now.",
         "summary_zh": "你的储备正在减少——此刻最重要的是温和地小小充电。",
+        "summary_ms": "Simpanan anda semakin berkurangan — pengisian semula yang kecil dan lembut paling penting sekarang.",
     },
     "mental_clarity": {
-        "focus": "Finding clarity", "focus_zh": "寻找清晰",
+        "focus": "Finding clarity", "focus_zh": "寻找清晰", "focus_ms": "Mencari kejelasan",
         "summary": "Things feel a little foggy. A slower pace could help the picture sharpen.",
         "summary_zh": "一切感觉有些模糊。放慢脚步，画面会渐渐清晰。",
+        "summary_ms": "Keadaan terasa agak kabur. Rentak yang lebih perlahan boleh membantu gambaran menjadi jelas.",
     },
     "inner_pressure": {
-        "focus": "Releasing pressure", "focus_zh": "释放压力",
+        "focus": "Releasing pressure", "focus_zh": "释放压力", "focus_ms": "Melepaskan tekanan",
         "summary": "You're carrying more than usual — this is a good moment to set something down.",
         "summary_zh": "你此刻承担得比平常更多——是时候放下一些东西了。",
+        "summary_ms": "Anda memikul lebih daripada biasa — ini masa yang baik untuk meletakkan sesuatu.",
     },
     "grounding": {
-        "focus": "Regaining grounding", "focus_zh": "重新扎根",
+        "focus": "Regaining grounding", "focus_zh": "重新扎根", "focus_ms": "Mendapatkan semula keteguhan",
         "summary": "You feel a little untethered. Reconnecting with routine could help you settle.",
         "summary_zh": "你感觉有些漂浮不定。回归日常习惯能帮你安定下来。",
+        "summary_ms": "Anda terasa agak terapung. Kembali kepada rutin boleh membantu anda tenang.",
     },
     "balanced": {
-        "focus": "Sustaining balance", "focus_zh": "维持平衡",
+        "focus": "Sustaining balance", "focus_zh": "维持平衡", "focus_ms": "Mengekalkan keseimbangan",
         "summary": "You're in a steady place across the board — a good moment to build on momentum.",
         "summary_zh": "你目前整体处于稳定状态——正是乘势而上的好时机。",
+        "summary_ms": "Anda stabil secara menyeluruh — masa yang baik untuk memanfaatkan momentum.",
     },
 }
 
@@ -71,72 +76,72 @@ FOCUS_CATEGORY = {
 # (UserUnlockedContent) — the first time an id is selected for a user,
 # it's added to their permanent collection.
 AFFIRMATIONS = {
-    "AFF01": {"en": "I am steady, even when things around me are not.", "zh": "即使身边风雨不定，我依然稳如磐石。"},
-    "AFF02": {"en": "I can move forward without forcing everything into place.", "zh": "我可以向前迈进，无需强求一切就位。"},
-    "AFF03": {"en": "My energy will return; I don't have to force it today.", "zh": "我的能量终会回来，今天无需勉强。"},
-    "AFF04": {"en": "I am allowed to rest without earning it first.", "zh": "我值得休息，不必先证明自己配得上。"},
-    "AFF05": {"en": "Clarity comes when I stop demanding it.", "zh": "当我不再强求时，清晰自会浮现。"},
-    "AFF06": {"en": "I trust myself to figure this out, one step at a time.", "zh": "我相信自己能一步一步理清一切。"},
-    "AFF07": {"en": "I don't have to carry everything at full intensity.", "zh": "我不必用尽全力扛起一切。"},
-    "AFF08": {"en": "I am capable of holding both effort and ease.", "zh": "我既能努力，也能从容。"},
-    "AFF09": {"en": "Small steps still count as moving forward.", "zh": "小小的步伐，依然是前进。"},
-    "AFF10": {"en": "I release what isn't mine to carry.", "zh": "我放下那些本不属于我的重担。"},
-    "AFF11": {"en": "I am grounded in who I am, not what I do.", "zh": "我的根基是我是谁，而非我做了什么。"},
-    "AFF12": {"en": "My feelings are information, not instructions.", "zh": "我的情绪是讯息，而非命令。"},
-    "AFF13": {"en": "I can be gentle with myself and still grow.", "zh": "我可以温柔待己，同时依然成长。"},
-    "AFF14": {"en": "Today's pace is enough.", "zh": "今天的步调，已经足够。"},
-    "AFF15": {"en": "I am building something steady, one day at a time.", "zh": "我正一天天地，建立稳固的自己。"},
-    "AFF16": {"en": "I don't need to have it all figured out yet.", "zh": "我不必现在就把一切想清楚。"},
-    "AFF17": {"en": "I choose calm over urgency where I can.", "zh": "能选择时，我选择平静而非匆忙。"},
-    "AFF18": {"en": "I am exactly where I need to be right now.", "zh": "此刻，我正处在该在的地方。"},
-    "AFF19": {"en": "My worth isn't measured by how much I get done.", "zh": "我的价值，不由完成多少事来衡量。"},
-    "AFF20": {"en": "I trust the process, even when I can't see the outcome.", "zh": "即使看不见结果，我依然相信过程。"},
+    "AFF01": {"en": "I am steady, even when things around me are not.", "zh": "即使身边风雨不定，我依然稳如磐石。", "ms": "Saya tetap teguh, walaupun keadaan di sekeliling saya tidak."},
+    "AFF02": {"en": "I can move forward without forcing everything into place.", "zh": "我可以向前迈进，无需强求一切就位。", "ms": "Saya boleh melangkah ke hadapan tanpa memaksa segalanya menjadi sempurna."},
+    "AFF03": {"en": "My energy will return; I don't have to force it today.", "zh": "我的能量终会回来，今天无需勉强。", "ms": "Tenaga saya akan kembali; saya tidak perlu memaksanya hari ini."},
+    "AFF04": {"en": "I am allowed to rest without earning it first.", "zh": "我值得休息，不必先证明自己配得上。", "ms": "Saya berhak berehat tanpa perlu membuktikan apa-apa dahulu."},
+    "AFF05": {"en": "Clarity comes when I stop demanding it.", "zh": "当我不再强求时，清晰自会浮现。", "ms": "Kejelasan datang apabila saya berhenti memaksanya."},
+    "AFF06": {"en": "I trust myself to figure this out, one step at a time.", "zh": "我相信自己能一步一步理清一切。", "ms": "Saya percaya saya mampu memahaminya, selangkah demi selangkah."},
+    "AFF07": {"en": "I don't have to carry everything at full intensity.", "zh": "我不必用尽全力扛起一切。", "ms": "Saya tidak perlu memikul segalanya dengan sepenuh tenaga."},
+    "AFF08": {"en": "I am capable of holding both effort and ease.", "zh": "我既能努力，也能从容。", "ms": "Saya mampu berusaha dan bertenang pada masa yang sama."},
+    "AFF09": {"en": "Small steps still count as moving forward.", "zh": "小小的步伐，依然是前进。", "ms": "Langkah kecil tetap dikira sebagai melangkah ke hadapan."},
+    "AFF10": {"en": "I release what isn't mine to carry.", "zh": "我放下那些本不属于我的重担。", "ms": "Saya lepaskan apa yang bukan beban saya untuk dipikul."},
+    "AFF11": {"en": "I am grounded in who I am, not what I do.", "zh": "我的根基是我是谁，而非我做了什么。", "ms": "Akar saya ialah siapa diri saya, bukan apa yang saya lakukan."},
+    "AFF12": {"en": "My feelings are information, not instructions.", "zh": "我的情绪是讯息，而非命令。", "ms": "Perasaan saya ialah maklumat, bukan arahan."},
+    "AFF13": {"en": "I can be gentle with myself and still grow.", "zh": "我可以温柔待己，同时依然成长。", "ms": "Saya boleh berlembut dengan diri sendiri dan tetap berkembang."},
+    "AFF14": {"en": "Today's pace is enough.", "zh": "今天的步调，已经足够。", "ms": "Rentak hari ini sudah memadai."},
+    "AFF15": {"en": "I am building something steady, one day at a time.", "zh": "我正一天天地，建立稳固的自己。", "ms": "Saya sedang membina sesuatu yang kukuh, sehari demi sehari."},
+    "AFF16": {"en": "I don't need to have it all figured out yet.", "zh": "我不必现在就把一切想清楚。", "ms": "Saya belum perlu memahami segalanya sekarang."},
+    "AFF17": {"en": "I choose calm over urgency where I can.", "zh": "能选择时，我选择平静而非匆忙。", "ms": "Apabila boleh memilih, saya memilih tenang daripada tergesa-gesa."},
+    "AFF18": {"en": "I am exactly where I need to be right now.", "zh": "此刻，我正处在该在的地方。", "ms": "Saya berada tepat di tempat yang sepatutnya buat masa ini."},
+    "AFF19": {"en": "My worth isn't measured by how much I get done.", "zh": "我的价值，不由完成多少事来衡量。", "ms": "Nilai saya tidak diukur dengan berapa banyak yang saya siapkan."},
+    "AFF20": {"en": "I trust the process, even when I can't see the outcome.", "zh": "即使看不见结果，我依然相信过程。", "ms": "Saya percaya pada prosesnya, walaupun belum nampak hasilnya."},
 }
 
 REFLECTION_QUESTIONS = {
-    "REF01": {"en": "What would it feel like to do less today, on purpose?", "zh": "如果今天刻意少做一些，会是什么感觉？"},
-    "REF02": {"en": "What's one thing you're carrying that isn't actually yours?", "zh": "有哪一件事，其实并不是你该扛的？"},
-    "REF03": {"en": "Where could you build in five quiet minutes today?", "zh": "今天你能在哪里挤出五分钟的安静？"},
-    "REF04": {"en": "What's the smallest version of progress you'd accept today?", "zh": "今天你能接受的、最小的进步是什么？"},
-    "REF05": {"en": "What are you afraid will happen if you slow down?", "zh": "如果放慢脚步，你担心会发生什么？"},
-    "REF06": {"en": "Who or what recharges you, and when did you last make time for it?", "zh": "什么人或事能让你充电？你上次留时间给它是什么时候？"},
-    "REF07": {"en": "What's one expectation you could quietly let go of this week?", "zh": "这周你能悄悄放下哪一项期待？"},
-    "REF08": {"en": "What does \"enough\" look like for you today?", "zh": "对你来说，今天的\"足够\"是什么样子？"},
-    "REF09": {"en": "What pattern do you notice repeating in how you feel lately?", "zh": "最近你的情绪中，反复出现了什么模式？"},
-    "REF10": {"en": "What would you tell a friend feeling exactly this way?", "zh": "如果朋友有同样的感受，你会对他说什么？"},
-    "REF11": {"en": "What's one small thing that's actually going well right now?", "zh": "此刻，有哪件小事其实进展得不错？"},
-    "REF12": {"en": "Where are you being harder on yourself than the situation calls for?", "zh": "在哪件事上，你对自己比情况所需更苛刻？"},
-    "REF13": {"en": "What's underneath the tiredness — is it physical, or something else?", "zh": "疲惫底下是什么？是身体，还是别的原因？"},
-    "REF14": {"en": "What would it look like to trust yourself a little more today?", "zh": "今天多信任自己一点，会是什么样子？"},
-    "REF15": {"en": "What's one boundary that would make today feel lighter?", "zh": "设下哪一条界限，会让今天轻松一些？"},
-    "REF16": {"en": "What are you making more complicated than it needs to be?", "zh": "有什么事，被你想得比实际更复杂？"},
-    "REF17": {"en": "What's one thing you can control today, when so much feels uncertain?", "zh": "在诸多不确定中，今天你能掌控的是什么？"},
-    "REF18": {"en": "How would you know if you were actually taking care of yourself?", "zh": "你怎么知道自己是否真正在照顾自己？"},
-    "REF19": {"en": "What's the story you're telling yourself about today, and is it true?", "zh": "你在对自己讲一个怎样的\"今天\"的故事？它真实吗？"},
-    "REF20": {"en": "What would \"good enough\" look like, instead of perfect?", "zh": "如果不追求完美，\"足够好\"会是什么样子？"},
+    "REF01": {"en": "What would it feel like to do less today, on purpose?", "zh": "如果今天刻意少做一些，会是什么感觉？", "ms": "Bagaimana rasanya jika hari ini anda sengaja buat lebih sedikit?"},
+    "REF02": {"en": "What's one thing you're carrying that isn't actually yours?", "zh": "有哪一件事，其实并不是你该扛的？", "ms": "Apakah satu perkara yang anda pikul sedangkan ia bukan milik anda?"},
+    "REF03": {"en": "Where could you build in five quiet minutes today?", "zh": "今天你能在哪里挤出五分钟的安静？", "ms": "Di mana anda boleh selitkan lima minit yang tenang hari ini?"},
+    "REF04": {"en": "What's the smallest version of progress you'd accept today?", "zh": "今天你能接受的、最小的进步是什么？", "ms": "Apakah kemajuan paling kecil yang anda sanggup terima hari ini?"},
+    "REF05": {"en": "What are you afraid will happen if you slow down?", "zh": "如果放慢脚步，你担心会发生什么？", "ms": "Apa yang anda bimbang akan berlaku jika anda perlahan sedikit?"},
+    "REF06": {"en": "Who or what recharges you, and when did you last make time for it?", "zh": "什么人或事能让你充电？你上次留时间给它是什么时候？", "ms": "Siapa atau apa yang mengisi semula tenaga anda, dan bila kali terakhir anda beri masa untuknya?"},
+    "REF07": {"en": "What's one expectation you could quietly let go of this week?", "zh": "这周你能悄悄放下哪一项期待？", "ms": "Apakah satu jangkaan yang boleh anda lepaskan diam-diam minggu ini?"},
+    "REF08": {"en": "What does \"enough\" look like for you today?", "zh": "对你来说，今天的\"足够\"是什么样子？", "ms": "Bagaimana rupa \"cukup\" bagi anda hari ini?"},
+    "REF09": {"en": "What pattern do you notice repeating in how you feel lately?", "zh": "最近你的情绪中，反复出现了什么模式？", "ms": "Corak apa yang anda perasan berulang dalam perasaan anda akhir-akhir ini?"},
+    "REF10": {"en": "What would you tell a friend feeling exactly this way?", "zh": "如果朋友有同样的感受，你会对他说什么？", "ms": "Apa yang akan anda katakan kepada seorang rakan yang merasa begini?"},
+    "REF11": {"en": "What's one small thing that's actually going well right now?", "zh": "此刻，有哪件小事其实进展得不错？", "ms": "Apakah satu perkara kecil yang sebenarnya berjalan lancar sekarang?"},
+    "REF12": {"en": "Where are you being harder on yourself than the situation calls for?", "zh": "在哪件事上，你对自己比情况所需更苛刻？", "ms": "Di mana anda lebih keras pada diri sendiri daripada yang sepatutnya?"},
+    "REF13": {"en": "What's underneath the tiredness — is it physical, or something else?", "zh": "疲惫底下是什么？是身体，还是别的原因？", "ms": "Apa yang ada di sebalik keletihan itu — fizikal, atau sesuatu yang lain?"},
+    "REF14": {"en": "What would it look like to trust yourself a little more today?", "zh": "今天多信任自己一点，会是什么样子？", "ms": "Bagaimana rupanya jika anda mempercayai diri sendiri sedikit lagi hari ini?"},
+    "REF15": {"en": "What's one boundary that would make today feel lighter?", "zh": "设下哪一条界限，会让今天轻松一些？", "ms": "Apakah satu sempadan yang akan meringankan hari anda?"},
+    "REF16": {"en": "What are you making more complicated than it needs to be?", "zh": "有什么事，被你想得比实际更复杂？", "ms": "Apa yang anda jadikan lebih rumit daripada yang sepatutnya?"},
+    "REF17": {"en": "What's one thing you can control today, when so much feels uncertain?", "zh": "在诸多不确定中，今天你能掌控的是什么？", "ms": "Dalam begitu banyak ketidakpastian, apa yang masih boleh anda kawal hari ini?"},
+    "REF18": {"en": "How would you know if you were actually taking care of yourself?", "zh": "你怎么知道自己是否真正在照顾自己？", "ms": "Bagaimana anda tahu yang anda benar-benar menjaga diri sendiri?"},
+    "REF19": {"en": "What's the story you're telling yourself about today, and is it true?", "zh": "你在对自己讲一个怎样的\"今天\"的故事？它真实吗？", "ms": "Apakah cerita yang anda ceritakan kepada diri sendiri tentang hari ini, dan adakah ia benar?"},
+    "REF20": {"en": "What would \"good enough\" look like, instead of perfect?", "zh": "如果不追求完美，\"足够好\"会是什么样子？", "ms": "Bagaimana rupa \"cukup baik\", berbanding sempurna?"},
 }
 
 INSIGHTS = {
-    "INS01": {"en": "Your reserves are running low — today's task is recovery, not achievement.", "zh": "你的能量储备正在减少——今天的任务是恢复，而非成就。"},
-    "INS02": {"en": "There's a quiet tiredness beneath the surface that's worth naming.", "zh": "表面之下有一种安静的疲惫，值得被看见。"},
-    "INS03": {"en": "Your energy dips are a reminder that rest is productive too.", "zh": "能量的起伏提醒着你，休息也是一种成效。"},
-    "INS04": {"en": "Low energy isn't failure — it's a signal to slow down.", "zh": "低能量不是失败，而是放慢脚步的信号。"},
-    "INS05": {"en": "Your thoughts are carrying more static than usual right now.", "zh": "此刻你的思绪比平时更多了些杂音。"},
-    "INS06": {"en": "Fog usually means bandwidth, not ability — it will lift.", "zh": "迷雾通常关乎精力，而非能力——它终会散去。"},
-    "INS07": {"en": "Clarity returns with less input, not more effort.", "zh": "清晰往往在减少输入、而非加倍努力时回归。"},
-    "INS08": {"en": "Today's uncertainty is temporary, even if it doesn't feel that way.", "zh": "今天的不确定只是暂时的，即使感觉并非如此。"},
-    "INS09": {"en": "You're holding more than usual — some of it isn't yours to carry.", "zh": "你此刻承担得比平常更多——其中有些并不属于你。"},
-    "INS10": {"en": "Pressure builds when expectations outpace capacity — yours have lately.", "zh": "当期待超出承受力时，压力便会累积——你最近正是如此。"},
-    "INS11": {"en": "What feels urgent right now may not be as urgent as it seems.", "zh": "此刻感觉紧迫的事，或许并没有看起来那么紧迫。"},
-    "INS12": {"en": "You tend to take on more than necessary — today shows it.", "zh": "你常常揽下超出必要的责任——今天正是如此。"},
-    "INS13": {"en": "You've been moving fast enough to lose your footing a little.", "zh": "你一直走得很快，以至于有些站不稳脚跟。"},
-    "INS14": {"en": "Feeling untethered is a sign to return to something familiar.", "zh": "漂浮不定时，是时候回到熟悉的事物中去。"},
-    "INS15": {"en": "Small routines matter more than big plans when you feel ungrounded.", "zh": "当你感到不踏实时，小小的日常习惯比宏大计划更重要。"},
-    "INS16": {"en": "Reconnecting with your body can help more than thinking your way through.", "zh": "重新连结身体，往往比一味思考更有帮助。"},
-    "INS17": {"en": "You're in a steady place across the board — a good moment to build.", "zh": "你目前整体处于稳定状态——正是建设的好时机。"},
-    "INS18": {"en": "Nothing urgent stands out today; that itself is worth noticing.", "zh": "今天没有特别紧迫的事，这本身就值得留意。"},
-    "INS19": {"en": "Steadiness like this is a good time to invest in what matters.", "zh": "这样的平稳，正适合投入到真正重要的事情上。"},
-    "INS20": {"en": "You have more capacity than usual — use it intentionally.", "zh": "你现在的余力比平时更多——不妨有意地善用它。"},
+    "INS01": {"en": "Your reserves are running low — today's task is recovery, not achievement.", "zh": "你的能量储备正在减少——今天的任务是恢复，而非成就。", "ms": "Simpanan tenaga anda semakin berkurangan — tugas hari ini ialah pemulihan, bukan pencapaian."},
+    "INS02": {"en": "There's a quiet tiredness beneath the surface that's worth naming.", "zh": "表面之下有一种安静的疲惫，值得被看见。", "ms": "Ada keletihan yang sunyi di sebalik permukaan, dan ia wajar diakui."},
+    "INS03": {"en": "Your energy dips are a reminder that rest is productive too.", "zh": "能量的起伏提醒着你，休息也是一种成效。", "ms": "Turun naik tenaga anda mengingatkan bahawa rehat juga satu pencapaian."},
+    "INS04": {"en": "Low energy isn't failure — it's a signal to slow down.", "zh": "低能量不是失败，而是放慢脚步的信号。", "ms": "Tenaga yang rendah bukan kegagalan — ia isyarat untuk perlahan sedikit."},
+    "INS05": {"en": "Your thoughts are carrying more static than usual right now.", "zh": "此刻你的思绪比平时更多了些杂音。", "ms": "Fikiran anda membawa lebih banyak kekusutan daripada biasa sekarang."},
+    "INS06": {"en": "Fog usually means bandwidth, not ability — it will lift.", "zh": "迷雾通常关乎精力，而非能力——它终会散去。", "ms": "Kabur biasanya soal ruang fikiran, bukan kebolehan — ia akan reda."},
+    "INS07": {"en": "Clarity returns with less input, not more effort.", "zh": "清晰往往在减少输入、而非加倍努力时回归。", "ms": "Kejelasan kembali dengan mengurangkan input, bukan menambah usaha."},
+    "INS08": {"en": "Today's uncertainty is temporary, even if it doesn't feel that way.", "zh": "今天的不确定只是暂时的，即使感觉并非如此。", "ms": "Ketidakpastian hari ini hanya sementara, walaupun rasanya tidak begitu."},
+    "INS09": {"en": "You're holding more than usual — some of it isn't yours to carry.", "zh": "你此刻承担得比平常更多——其中有些并不属于你。", "ms": "Anda memikul lebih daripada biasa — sebahagiannya bukan milik anda."},
+    "INS10": {"en": "Pressure builds when expectations outpace capacity — yours have lately.", "zh": "当期待超出承受力时，压力便会累积——你最近正是如此。", "ms": "Tekanan terbina apabila jangkaan melebihi keupayaan — itu yang berlaku pada anda akhir-akhir ini."},
+    "INS11": {"en": "What feels urgent right now may not be as urgent as it seems.", "zh": "此刻感觉紧迫的事，或许并没有看起来那么紧迫。", "ms": "Apa yang terasa mendesak sekarang mungkin tidak semendesak yang disangka."},
+    "INS12": {"en": "You tend to take on more than necessary — today shows it.", "zh": "你常常揽下超出必要的责任——今天正是如此。", "ms": "Anda cenderung memikul lebih daripada yang perlu — hari ini menunjukkannya."},
+    "INS13": {"en": "You've been moving fast enough to lose your footing a little.", "zh": "你一直走得很快，以至于有些站不稳脚跟。", "ms": "Anda bergerak cukup laju sehingga sedikit hilang pijakan."},
+    "INS14": {"en": "Feeling untethered is a sign to return to something familiar.", "zh": "漂浮不定时，是时候回到熟悉的事物中去。", "ms": "Rasa terapung ialah tanda untuk kembali kepada sesuatu yang biasa."},
+    "INS15": {"en": "Small routines matter more than big plans when you feel ungrounded.", "zh": "当你感到不踏实时，小小的日常习惯比宏大计划更重要。", "ms": "Rutin kecil lebih bermakna daripada rancangan besar ketika anda rasa tidak berpijak."},
+    "INS16": {"en": "Reconnecting with your body can help more than thinking your way through.", "zh": "重新连结身体，往往比一味思考更有帮助。", "ms": "Menghubungkan semula dengan tubuh anda boleh membantu lebih daripada terus berfikir."},
+    "INS17": {"en": "You're in a steady place across the board — a good moment to build.", "zh": "你目前整体处于稳定状态——正是建设的好时机。", "ms": "Anda berada dalam keadaan yang stabil secara menyeluruh — masa yang baik untuk membina."},
+    "INS18": {"en": "Nothing urgent stands out today; that itself is worth noticing.", "zh": "今天没有特别紧迫的事，这本身就值得留意。", "ms": "Tiada yang mendesak hari ini; itu sendiri patut disedari."},
+    "INS19": {"en": "Steadiness like this is a good time to invest in what matters.", "zh": "这样的平稳，正适合投入到真正重要的事情上。", "ms": "Kestabilan seperti ini sesuai untuk melabur pada perkara yang penting."},
+    "INS20": {"en": "You have more capacity than usual — use it intentionally.", "zh": "你现在的余力比平时更多——不妨有意地善用它。", "ms": "Anda mempunyai lebih ruang daripada biasa — gunakannya dengan sengaja."},
 }
 
 # Which insight ids are candidates for a given resolve_focus_key() result —
@@ -204,7 +209,7 @@ ARCHETYPE_KEYS = list(ARCHETYPES.keys())
 
 COLOURS = {
     "scarlet": {
-        "key": "scarlet", "name": "Scarlet", "name_zh": "赤红", "swatch": "#c0392b",
+        "key": "scarlet", "name": "Scarlet", "name_zh": "赤红", "name_ms": "Merah Tua", "swatch": "#c0392b",
         "traits": ["Vitality", "Passion", "Courage"],
         "description": "A bold, energising red that awakens motivation and physical vitality.",
         "article": "Scarlet is the colour of movement — it's what the body reaches for when energy is running low and momentum needs a spark. It's associated with vitality, passion and courage: not recklessness, but the willingness to act on what matters.",
@@ -214,7 +219,7 @@ COLOURS = {
         "negative_traits": ["Impulsive", "Restless", "Impatient", "Quick-tempered", "Overextended"],
     },
     "russet": {
-        "key": "russet", "name": "Russet", "name_zh": "赭红", "swatch": "#8b4a2b",
+        "key": "russet", "name": "Russet", "name_zh": "赭红", "name_ms": "Perang Kemerahan", "swatch": "#8b4a2b",
         "traits": ["Stability", "Warmth", "Resilience"],
         "description": "A warm, earthy brown-red that steadies you and restores a sense of resilience.",
         "article": "Russet is the colour of solid ground — the warm brown-red of autumn leaves and turned soil. It carries stability rather than urgency, built slowly through repetition rather than a single grand gesture.",
@@ -224,7 +229,7 @@ COLOURS = {
         "negative_traits": ["Stubborn", "Slow to change", "Guarded", "Overcautious", "Rigid"],
     },
     "gold": {
-        "key": "gold", "name": "Gold", "name_zh": "金黄", "swatch": "#b9902a",
+        "key": "gold", "name": "Gold", "name_zh": "金黄", "name_ms": "Emas", "swatch": "#b9902a",
         "traits": ["Confidence", "Abundance", "Radiance"],
         "description": "A warm, radiant gold that reflects confidence and sustained, balanced progress.",
         "article": "Gold is the colour of quiet achievement — not the loud win, but the steady accumulation of effort that's finally visible. It asks you to notice what's already working rather than chase more.",
@@ -234,7 +239,7 @@ COLOURS = {
         "negative_traits": ["Complacent", "Overconfident", "Showy", "Entitled", "Coasting"],
     },
     "forest": {
-        "key": "forest", "name": "Forest", "name_zh": "森绿", "swatch": "#4a6b3d",
+        "key": "forest", "name": "Forest", "name_zh": "森绿", "name_ms": "Hijau Hutan", "swatch": "#4a6b3d",
         "traits": ["Grounding", "Growth", "Renewal"],
         "description": "A deep, grounding green that supports steadiness, emotional recovery and sustainable growth.",
         "article": "Forest is the colour of steady, unhurried growth — the deep green of old trees rather than a new sprout. Especially supportive when pressure has been building: it asks you to root down, not push harder.",
@@ -244,7 +249,7 @@ COLOURS = {
         "negative_traits": ["Withdrawn", "Overcommitted", "Depleted", "Avoidant", "Slow to ask for help"],
     },
     "ocean": {
-        "key": "ocean", "name": "Ocean", "name_zh": "海蓝", "swatch": "#3f8f8a",
+        "key": "ocean", "name": "Ocean", "name_zh": "海蓝", "name_ms": "Biru Laut", "swatch": "#3f8f8a",
         "traits": ["Calm", "Clarity", "Communication"],
         "description": "A cool, clear blue-teal that supports calm thinking and honest communication.",
         "article": "Ocean is the colour of a clear mind — cool, spacious and unclouded. When thoughts feel tangled, ocean points toward stillness rather than more input: fewer tabs open, one conversation instead of many.",
@@ -257,11 +262,11 @@ COLOURS = {
 COLOUR_ORDER = ["scarlet", "russet", "gold", "forest", "ocean"]
 
 FOCUS_TO_COLOUR = {
-    "Rebuilding energy": {"colour_key": "scarlet", "tags": ["energy", "lift"], "routine": "A 10-minute walk before noon, away from screens.", "routine_zh": "中午前进行10分钟散步，远离屏幕。"},
-    "Finding clarity": {"colour_key": "ocean", "tags": ["clarity", "focus"], "routine": "Write down the one thing that matters most today, before anything else.", "routine_zh": "先写下今天最重要的一件事，再做其他事情。"},
-    "Releasing pressure": {"colour_key": "forest", "tags": ["release", "calm"], "routine": "Set a 15-minute timer to do nothing but breathe and let your shoulders drop.", "routine_zh": "设定15分钟计时器，只专注呼吸，让肩膀放松下沉。"},
-    "Regaining grounding": {"colour_key": "russet", "tags": ["grounding", "steadiness"], "routine": "Stand barefoot for two minutes and name five things you can feel.", "routine_zh": "赤脚站立两分钟，说出五件你能感觉到的事物。"},
-    "Sustaining balance": {"colour_key": "gold", "tags": ["calm", "reflection"], "routine": "Keep doing what's working — a short reflection tonight will reinforce it.", "routine_zh": "继续做有效的事——今晚简短反思会强化它。"},
+    "Rebuilding energy": {"colour_key": "scarlet", "tags": ["energy", "lift"], "routine": "A 10-minute walk before noon, away from screens.", "routine_zh": "中午前进行10分钟散步，远离屏幕。", "routine_ms": "Berjalan 10 minit sebelum tengah hari, jauh daripada skrin."},
+    "Finding clarity": {"colour_key": "ocean", "tags": ["clarity", "focus"], "routine": "Write down the one thing that matters most today, before anything else.", "routine_zh": "先写下今天最重要的一件事，再做其他事情。", "routine_ms": "Tuliskan satu perkara paling penting hari ini, sebelum apa-apa yang lain."},
+    "Releasing pressure": {"colour_key": "forest", "tags": ["release", "calm"], "routine": "Set a 15-minute timer to do nothing but breathe and let your shoulders drop.", "routine_zh": "设定15分钟计时器，只专注呼吸，让肩膀放松下沉。", "routine_ms": "Tetapkan pemasa 15 minit untuk hanya bernafas dan biarkan bahu anda turun."},
+    "Regaining grounding": {"colour_key": "russet", "tags": ["grounding", "steadiness"], "routine": "Stand barefoot for two minutes and name five things you can feel.", "routine_zh": "赤脚站立两分钟，说出五件你能感觉到的事物。", "routine_ms": "Berdiri berkaki ayam selama dua minit dan namakan lima perkara yang anda dapat rasa."},
+    "Sustaining balance": {"colour_key": "gold", "tags": ["calm", "reflection"], "routine": "Keep doing what's working — a short reflection tonight will reinforce it.", "routine_zh": "继续做有效的事——今晚简短反思会强化它。", "routine_ms": "Teruskan apa yang berkesan — refleksi ringkas malam ini akan mengukuhkannya."},
 }
 
 # Deterministic "material affinity" — same spirit as FOCUS_TO_COLOUR above
@@ -290,12 +295,12 @@ STONE_TYPES = ("Crystal", "Nephrite", "Jade")
 # missing _zh here is untranslated text on screen — there is no AI step in
 # between to fall back on.
 BADGE_DEFINITIONS = [
-    {"key": "three_day_streak", "group": "consistency", "title": "Three Days Steady", "title_zh": "稳稳三天", "description": "Reflected three days in a row.", "description_zh": "连续三天进行了反思。", "icon": "🌤️"},
-    {"key": "two_week_rhythm", "group": "consistency", "title": "Two-Week Rhythm", "title_zh": "两周节奏", "description": "Kept a 14-day reflection streak.", "description_zh": "保持了 14 天的反思连续纪录。", "icon": "🕰️"},
-    {"key": "first_insight", "group": "depth", "title": "First Insight", "title_zh": "初次洞察", "description": "Completed your first Inner Reading.", "description_zh": "完成了你的第一次深度解读。", "icon": "🔍"},
-    {"key": "deep_diver", "group": "depth", "title": "Deep Diver", "title_zh": "深潜者", "description": "Completed five Inner Readings.", "description_zh": "完成了五次深度解读。", "icon": "🌊"},
-    {"key": "first_bloom", "group": "growth", "title": "First Bloom", "title_zh": "初次绽放", "description": "Grew your Garden to full bloom in a week.", "description_zh": "在一周内让你的花园完全绽放。", "icon": "🌸"},
-    {"key": "momentum", "group": "growth", "title": "Momentum", "title_zh": "势能", "description": "Earned 300 total XP.", "description_zh": "累计获得 300 点经验值。", "icon": "⚡"},
+    {"key": "three_day_streak", "group": "consistency", "title": "Three Days Steady", "title_zh": "稳稳三天", "description": "Reflected three days in a row.", "description_zh": "连续三天进行了反思。", "title_ms": "Tiga Hari Mantap", "description_ms": "Berefleksi tiga hari berturut-turut.", "icon": "🌤️"},
+    {"key": "two_week_rhythm", "group": "consistency", "title": "Two-Week Rhythm", "title_zh": "两周节奏", "description": "Kept a 14-day reflection streak.", "description_zh": "保持了 14 天的反思连续纪录。", "title_ms": "Rentak Dua Minggu", "description_ms": "Mengekalkan rentetan refleksi selama 14 hari.", "icon": "🕰️"},
+    {"key": "first_insight", "group": "depth", "title": "First Insight", "title_zh": "初次洞察", "description": "Completed your first Inner Reading.", "description_zh": "完成了你的第一次深度解读。", "title_ms": "Wawasan Pertama", "description_ms": "Melengkapkan Bacaan Dalaman pertama anda.", "icon": "🔍"},
+    {"key": "deep_diver", "group": "depth", "title": "Deep Diver", "title_zh": "深潜者", "description": "Completed five Inner Readings.", "description_zh": "完成了五次深度解读。", "title_ms": "Penyelam Dalam", "description_ms": "Melengkapkan lima Bacaan Dalaman.", "icon": "🌊"},
+    {"key": "first_bloom", "group": "growth", "title": "First Bloom", "title_zh": "初次绽放", "description": "Grew your Garden to full bloom in a week.", "description_zh": "在一周内让你的花园完全绽放。", "title_ms": "Kembang Pertama", "description_ms": "Menumbuhkan Taman anda hingga mekar penuh dalam seminggu.", "icon": "🌸"},
+    {"key": "momentum", "group": "growth", "title": "Momentum", "title_zh": "势能", "description": "Earned 300 total XP.", "description_zh": "累计获得 300 点经验值。", "title_ms": "Momentum", "description_ms": "Memperoleh 300 XP keseluruhan.", "icon": "⚡"},
 ]
 BADGE_DEFINITIONS_BY_KEY = {b["key"]: b for b in BADGE_DEFINITIONS}
 
@@ -317,10 +322,10 @@ def _reward_archetype_deep_dive(ctx: dict) -> bool:
 
 
 REWARD_DEFINITIONS = [
-    {"key": "golden_hour_playlist", "title": "Golden Hour Playlist", "title_zh": "黄昏时光歌单", "description": "A wind-down playlist curated for grounding evenings.", "description_zh": "为安定的夜晚精选的放松歌单。", "icon": "🎧", "requirement": "Reach 50 XP", "requirement_zh": "累计达到 50 点经验值", "is_eligible": _reward_golden_hour},
-    {"key": "grounding_ritual_guide", "title": "Grounding Ritual Guide", "title_zh": "扎根仪式指南", "description": "A short guide to a 5-minute grounding ritual.", "description_zh": "一份五分钟扎根仪式的简短指南。", "icon": "📖", "requirement": "Reach 150 XP", "requirement_zh": "累计达到 150 点经验值", "is_eligible": _reward_grounding_ritual},
-    {"key": "founding_streak_candle", "title": "Founding Streak Candle Discount", "title_zh": "创始连续纪录蜡烛折扣", "description": "15% toward any candle in the Gio store.", "description_zh": "Gio 商店任意蜡烛可享 15% 折扣。", "icon": "🕯️", "requirement": "Reach a 7-day streak", "requirement_zh": "达成 7 天连续纪录", "is_eligible": _reward_founding_candle},
-    {"key": "archetype_deep_dive", "title": "Archetype Deep-Dive Report", "title_zh": "原型深度解析报告", "description": "An extended written breakdown of your archetype.", "description_zh": "一份关于你的原型的延伸文字解析。", "icon": "📜", "requirement": "Earn 3 badges", "requirement_zh": "获得 3 枚徽章", "is_eligible": _reward_archetype_deep_dive},
+    {"key": "golden_hour_playlist", "title": "Golden Hour Playlist", "title_zh": "黄昏时光歌单", "description": "A wind-down playlist curated for grounding evenings.", "description_zh": "为安定的夜晚精选的放松歌单。", "icon": "🎧", "requirement": "Reach 50 XP", "requirement_zh": "累计达到 50 点经验值", "title_ms": "Senarai Lagu Waktu Senja", "description_ms": "Senarai lagu menenangkan yang dipilih untuk malam yang damai.", "requirement_ms": "Capai 50 XP", "is_eligible": _reward_golden_hour},
+    {"key": "grounding_ritual_guide", "title": "Grounding Ritual Guide", "title_zh": "扎根仪式指南", "description": "A short guide to a 5-minute grounding ritual.", "description_zh": "一份五分钟扎根仪式的简短指南。", "icon": "📖", "requirement": "Reach 150 XP", "requirement_zh": "累计达到 150 点经验值", "title_ms": "Panduan Ritual Keteguhan", "description_ms": "Panduan ringkas untuk ritual keteguhan 5 minit.", "requirement_ms": "Capai 150 XP", "is_eligible": _reward_grounding_ritual},
+    {"key": "founding_streak_candle", "title": "Founding Streak Candle Discount", "title_zh": "创始连续纪录蜡烛折扣", "description": "15% toward any candle in the Gio store.", "description_zh": "Gio 商店任意蜡烛可享 15% 折扣。", "icon": "🕯️", "requirement": "Reach a 7-day streak", "requirement_zh": "达成 7 天连续纪录", "title_ms": "Diskaun Lilin Rentetan Perintis", "description_ms": "15% untuk mana-mana lilin di kedai Gio.", "requirement_ms": "Capai rentetan 7 hari", "is_eligible": _reward_founding_candle},
+    {"key": "archetype_deep_dive", "title": "Archetype Deep-Dive Report", "title_zh": "原型深度解析报告", "description": "An extended written breakdown of your archetype.", "description_zh": "一份关于你的原型的延伸文字解析。", "icon": "📜", "requirement": "Earn 3 badges", "requirement_zh": "获得 3 枚徽章", "title_ms": "Laporan Mendalam Arketaip", "description_ms": "Pecahan bertulis lanjutan tentang arketaip anda.", "requirement_ms": "Peroleh 3 lencana", "is_eligible": _reward_archetype_deep_dive},
 ]
 REWARD_DEFINITIONS_BY_KEY = {r["key"]: r for r in REWARD_DEFINITIONS}
 
@@ -328,8 +333,8 @@ REWARD_DEFINITIONS_BY_KEY = {r["key"]: r for r in REWARD_DEFINITIONS}
 # list per type because badges and rewards are each built at more than one
 # call site — threading a new field by hand at each of them is how one site
 # ends up silently serving None (and so, English) forever.
-BADGE_DISPLAY_FIELDS = ("group", "title", "title_zh", "description", "description_zh", "icon")
-REWARD_DISPLAY_FIELDS = ("title", "title_zh", "description", "description_zh", "icon", "requirement", "requirement_zh")
+BADGE_DISPLAY_FIELDS = ("group", "title", "title_zh", "title_ms", "description", "description_zh", "description_ms", "icon")
+REWARD_DISPLAY_FIELDS = ("title", "title_zh", "title_ms", "description", "description_zh", "description_ms", "icon", "requirement", "requirement_zh", "requirement_ms")
 
 
 def badge_display(definition: dict) -> dict:

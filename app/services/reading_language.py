@@ -12,22 +12,38 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.models.reflection import InnerReading
+from app.services import languages
 from app.services.ai_outcome import generate_reading_secondary_language
 from app.services.scoring import focus_label_for, resolve_focus_key
 
 logger = logging.getLogger(__name__)
 
-OTHER_LANGUAGE = {"en": "zh", "zh": "en"}
-
-
 def field(reading: InnerReading, name: str, language: str):
-    """English lives in the unsuffixed column, Chinese in `<name>_zh` — the
-    same layout CheckInSession uses, so there is no `_en` suffix to read."""
-    return getattr(reading, name if language == "en" else f"{name}_zh")
+    """English lives in the unsuffixed column, other languages in
+    `<name>_<code>` — the same layout CheckInSession uses, so there is no
+    `_en` suffix to read. The suffix itself comes from services/languages.py
+    so the convention is stated once."""
+    return getattr(reading, f"{name}{languages.column_suffix(language)}", None)
 
 
 def set_field(reading: InnerReading, name: str, language: str, value) -> None:
-    setattr(reading, name if language == "en" else f"{name}_zh", value)
+    setattr(reading, f"{name}{languages.column_suffix(language)}", value)
+
+
+def localized(reading: InnerReading, name: str, requested: str, preferred: str | None = None):
+    """First language in the fallback chain that actually has content.
+
+    With two languages a simple `a ?? b` sufficed. With three, "missing"
+    has to be resolved in a defined order — requested, then the account's
+    preference, then English — or a Malay user with a half-generated
+    reading sees a blank card instead of the English that is sitting right
+    there.
+    """
+    for code in languages.fallback_chain(requested, preferred):
+        value = field(reading, name, code)
+        if value:
+            return value
+    return None
 
 
 def dims_of(reading: InnerReading) -> dict[str, int]:
@@ -40,8 +56,8 @@ def dims_of(reading: InnerReading) -> dict[str, int]:
 
 
 async def fill_secondary_language(db: Session, reading: InnerReading, language: str) -> bool:
-    """Generate `language` for a reading that already has its other one, and
-    flip it to READY. Returns True on success.
+    """Generate one missing `language` for a reading that already has its
+    primary, and record it. Returns True on success.
 
     Does not manage the session: the caller owns it, commits, and decides
     what a failure means. Raises nothing — a failed generation returns False
@@ -74,5 +90,9 @@ async def fill_secondary_language(db: Session, reading: InnerReading, language: 
         "personal_growth": content.life_area_personal_growth,
         "conflict_management": content.life_area_conflict_management,
     })
-    reading.generation_status = "READY"
+    # Not a bare "READY": there are two of these passes now, and the first
+    # to finish must not claim the row is complete. record_ready decides.
+    reading.languages_ready, reading.generation_status = languages.record_ready(
+        reading.languages_ready, language
+    )
     return True

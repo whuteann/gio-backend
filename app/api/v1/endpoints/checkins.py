@@ -99,9 +99,9 @@ async def submit_check_in(payload: CheckInSubmitRequest, user: User = Depends(ge
         narrative_content={
             "insight": INSIGHTS[insight_id],
             "reflection_question": REFLECTION_QUESTIONS[reflection_question_id],
-            "reminder": {"en": ai_outcome.reminder.en, "zh": ai_outcome.reminder.zh},
-            "current_focus": {"en": ai_outcome.current_focus.en, "zh": ai_outcome.current_focus.zh},
-            "friendly_advice": {"en": ai_outcome.friendly_advice.en, "zh": ai_outcome.friendly_advice.zh},
+            "reminder": ai_outcome.reminder.model_dump(),
+            "current_focus": ai_outcome.current_focus.model_dump(),
+            "friendly_advice": ai_outcome.friendly_advice.model_dump(),
             "affirmation": AFFIRMATIONS[affirmation_id],
         },
         affirmation_id=affirmation_id, insight_id=insight_id, reflection_question_id=reflection_question_id,
@@ -113,8 +113,10 @@ async def submit_check_in(payload: CheckInSubmitRequest, user: User = Depends(ge
     )
     session.title = ai_outcome.title.en
     session.title_zh = ai_outcome.title.zh
+    session.title_ms = ai_outcome.title.ms
     session.subtitle = ai_outcome.subtitle.en
     session.subtitle_zh = ai_outcome.subtitle.zh
+    session.subtitle_ms = ai_outcome.subtitle.ms
     # Deterministic, not AI — see docs/behaviour_log_0006.md's resolved
     # open question: NarrativeEntry.summary is the one AI-facing memory
     # record for this event; CheckInSession.summary is just a short label.

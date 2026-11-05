@@ -1,14 +1,23 @@
 from pydantic import BaseModel
 
 
-class BilingualText(BaseModel):
-    """One generated string, in both languages — the model writes each
-    language directly rather than one being a translation of the other.
-    Shared by every AI schema that needs a genuinely bilingual field (see
-    gio-member-app/docs/behaviour_log_0002.md)."""
+class LocalizedText(BaseModel):
+    """One generated string, in every supported language — the model writes
+    each language directly rather than one being a translation of the other.
+    Shared by every AI schema whose field is cheap enough to generate in all
+    languages on the blocking call (see gio-member-app/docs/
+    behaviour_log_0002.md). Was BilingualText; renamed when Malay landed,
+    since the field count now follows services/languages.SUPPORTED and the
+    old name would have to be re-read as "three" to stay true.
+
+    Heavy fields (Inner Reading's narrative, Core Personality's overview) do
+    NOT use this — they generate one language per call and fill the rest from
+    a BackgroundTask, which is why those live in per-language columns
+    instead."""
 
     en: str
     zh: str
+    ms: str
 
 
 class NumberPoint(BaseModel):

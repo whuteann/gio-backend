@@ -17,6 +17,7 @@ PASSWORD_RESET_CODE_TTL_MINUTES = 10
 _RESET_SUBJECT = {
     "en": "Your Auren password reset code",
     "zh": "您的 Auren 密码重置验证码",
+    "ms": "Kod tetapan semula kata laluan Auren anda",
 }
 
 _RESET_BODY = {
@@ -51,12 +52,29 @@ _RESET_BODY = {
   </p>
 </div>
 """,
+    "ms": """
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#1c1917">
+  <h1 style="font-size:20px;font-weight:600;margin:0 0 16px">Tetapkan semula kata laluan anda</h1>
+  <p style="font-size:15px;line-height:1.6;margin:0 0 24px">
+    Hai {display_name}, gunakan kod ini untuk menetapkan kata laluan baharu:
+  </p>
+  <p style="font-size:34px;font-weight:700;letter-spacing:10px;margin:0 0 24px;color:#0f172a">{code}</p>
+  <p style="font-size:14px;line-height:1.6;color:#57534e;margin:0 0 8px">
+    Kod ini tamat dalam {ttl} minit dan hanya boleh digunakan sekali.
+  </p>
+  <p style="font-size:14px;line-height:1.6;color:#57534e;margin:0">
+    Jika anda tidak meminta tetapan semula kata laluan, abaikan sahaja e-mel ini —
+    tiada apa-apa yang berubah.
+  </p>
+</div>
+""",
 }
 
 
 _VERIFY_SUBJECT = {
     "en": "Verify your Auren email",
     "zh": "验证您的 Auren 邮箱",
+    "ms": "Sahkan e-mel Auren anda",
 }
 
 _VERIFY_BODY = {
@@ -87,6 +105,21 @@ _VERIFY_BODY = {
   </p>
   <p style="font-size:14px;line-height:1.6;color:#57534e;margin:0">
     如果您没有注册 Auren 账户，请忽略此邮件。
+  </p>
+</div>
+""",
+    "ms": """
+<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;color:#1c1917">
+  <h1 style="font-size:20px;font-weight:600;margin:0 0 16px">Selamat datang ke Auren</h1>
+  <p style="font-size:15px;line-height:1.6;margin:0 0 24px">
+    Hai {display_name}, gunakan kod ini untuk mengesahkan e-mel anda dan melengkapkan penyediaan akaun:
+  </p>
+  <p style="font-size:34px;font-weight:700;letter-spacing:10px;margin:0 0 24px;color:#0f172a">{code}</p>
+  <p style="font-size:14px;line-height:1.6;color:#57534e;margin:0 0 8px">
+    Kod ini tamat dalam {ttl} minit dan hanya boleh digunakan sekali.
+  </p>
+  <p style="font-size:14px;line-height:1.6;color:#57534e;margin:0">
+    Jika anda tidak mencipta akaun Auren, abaikan sahaja e-mel ini.
   </p>
 </div>
 """,

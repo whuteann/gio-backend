@@ -21,8 +21,10 @@ class BadgeOut(BaseModel):
     # serializes; the frontend falls back to the English field.
     title: str
     title_zh: str | None = None
+    title_ms: str | None = None
     description: str
     description_zh: str | None = None
+    description_ms: str | None = None
     icon: str
     earned: bool
     earned_at: str | None
@@ -40,11 +42,14 @@ class RewardOut(BaseModel):
     key: str
     title: str
     title_zh: str | None = None
+    title_ms: str | None = None
     description: str
     description_zh: str | None = None
+    description_ms: str | None = None
     icon: str
     requirement: str
     requirement_zh: str | None = None
+    requirement_ms: str | None = None
     state: str
     unlocked_at: str | None
     redeemed_at: str | None
@@ -52,7 +57,7 @@ class RewardOut(BaseModel):
 
 class UnlockedItemOut(BaseModel):
     """One slot in the curated content library (docs/behaviour_log_0011.md).
-    `text_en`/`text_zh` are null for a locked item — the server withholds
+    Every `text_*` is null for a locked item — the server withholds
     the content, not just the client, so a locked badge can't be
     inspected to learn what it says before it's earned."""
 
@@ -60,6 +65,7 @@ class UnlockedItemOut(BaseModel):
     unlocked: bool
     text_en: str | None
     text_zh: str | None
+    text_ms: str | None
     unlocked_at: str | None
 
 

@@ -44,6 +44,7 @@ from app.services.gamification import today_utc
 from app.services.lumenart import get_phone_case_candidates
 from app.services.narrative import lock_user
 from app.services.narrative_prompt import build_narrative_prompt
+from app.services import languages
 from app.services.product_api import fetch_products, parse_specifications
 from app.services.scoring import resolve_focus_key
 
@@ -77,12 +78,47 @@ async def _fetch_and_pick(
     )
 
 
+def _colour_item(colour: dict, focus_copy: dict, focus_label: str) -> RecommendationItem:
+    """The deterministic COLOUR row. Extracted because it was written out
+    twice — once per branch of ensure_recommendation — which is two places
+    to forget a language in."""
+    return RecommendationItem(
+        type="COLOUR", reference_id=colour["key"],
+        title=colour["name"], title_zh=colour["name_zh"], title_ms=colour["name_ms"],
+        reason=f"Matched to your current focus — {focus_label.lower()}.",
+        reason_zh=f"根据你当前的重点——{focus_copy['focus_zh']}——为你匹配。",
+        reason_ms=f"Dipadankan dengan fokus anda sekarang — {focus_copy['focus_ms'].lower()}.",
+        rank=1,
+    )
+
+
+def _routine_item(profile_data: dict, title_for_reason: str) -> RecommendationItem:
+    """The deterministic ROUTINE row — see _colour_item on why it's here."""
+    return RecommendationItem(
+        type="ROUTINE", reference_id=None,
+        title=profile_data["routine"], title_zh=profile_data["routine_zh"],
+        title_ms=profile_data["routine_ms"],
+        reason=f"A small, doable step suited to {title_for_reason.lower()}.",
+        # zh/ms drop the state label the English line interpolates: it reads
+        # naturally in English and awkwardly when inflected into either of
+        # the others, and the label is already on screen above this row.
+        reason_zh="一个适合你此刻状态的小小可行步骤。",
+        reason_ms="Satu langkah kecil yang mudah dilakukan, sesuai dengan keadaan anda kini.",
+        rank=2,
+    )
+
+
 def _product_item(product: dict, *, rank: int) -> RecommendationItem:
     product_id = product.get("id")
     return RecommendationItem(
         type="PRODUCT", reference_id=str(product_id) if product_id else None,
-        title=product.get("name") or "Recommended piece", title_zh=product.get("name"),
+        # The vendor supplies one product name, not a per-language set — the
+        # same string in every column, deliberately, so a Malay reader sees
+        # the real product name rather than a blank.
+        title=product.get("name") or "Recommended piece",
+        title_zh=product.get("name"), title_ms=product.get("name"),
         reason=product["reason_en"], reason_zh=product["reason_zh"],
+        reason_ms=product.get("reason_ms"),
         rank=rank,
         image_url=product.get("primary_image"),
         price=_parse_price(product.get("price")),
@@ -99,8 +135,13 @@ def _phone_case_item(product: dict, *, rank: int) -> RecommendationItem:
     handle = product.get("handle")
     return RecommendationItem(
         type="PHONE_CASE", reference_id=str(product_id) if product_id else None,
-        title=product.get("name") or "Recommended piece", title_zh=product.get("name"),
+        # The vendor supplies one product name, not a per-language set — the
+        # same string in every column, deliberately, so a Malay reader sees
+        # the real product name rather than a blank.
+        title=product.get("name") or "Recommended piece",
+        title_zh=product.get("name"), title_ms=product.get("name"),
         reason=product["reason_en"], reason_zh=product["reason_zh"],
+        reason_ms=product.get("reason_ms"),
         rank=rank,
         image_url=product.get("primary_image"),
         price=_parse_price(product.get("price")),
@@ -131,10 +172,11 @@ def _refresh_product_items(
             "Recommendation fetch/pick failed for recommendation %s (colour=%s, material=%s) — no PRODUCT/PHONE_CASE items this run.",
             profile.id, colour_key, material_affinity,
         )
-        result = {"letter_en": "", "letter_zh": "", "feature": None, "others": [], "phone_case": []}
+        result = {**{f"letter_{code}": "" for code in languages.SUPPORTED},
+                  "feature": None, "others": [], "phone_case": []}
 
-    profile.letter_en = result["letter_en"] or None
-    profile.letter_zh = result["letter_zh"] or None
+    for code in languages.SUPPORTED:
+        setattr(profile, f"letter_{code}", result.get(f"letter_{code}") or None)
 
     rank = next_rank
     if result["feature"]:
@@ -178,8 +220,10 @@ def build_recommendation(
         existing.trigger_inner_reading_id = trigger_inner_reading_id
         existing.current_focus = focus_label
         existing.current_focus_zh = focus_copy["focus_zh"]
+        existing.current_focus_ms = focus_copy["focus_ms"]
         existing.summary = focus_copy["summary"]
         existing.summary_zh = focus_copy["summary_zh"]
+        existing.summary_ms = focus_copy["summary_ms"]
         existing.colour_key = colour["key"]
         existing.material_affinity = material_affinity
         existing.generated_at = datetime.now(timezone.utc)
@@ -187,20 +231,8 @@ def build_recommendation(
             existing.items.remove(item)
             db.delete(item)
         db.flush()
-        existing.items.append(RecommendationItem(
-            type="COLOUR", reference_id=colour["key"],
-            title=colour["name"], title_zh=colour["name_zh"],
-            reason=f"Matched to your current focus — {focus_label.lower()}.",
-            reason_zh=f"根据你当前的重点——{focus_copy['focus_zh']}——为你匹配。",
-            rank=1,
-        ))
-        existing.items.append(RecommendationItem(
-            type="ROUTINE", reference_id=None,
-            title=profile_data["routine"], title_zh=profile_data["routine_zh"],
-            reason=f"A small, doable step suited to {title_for_reason.lower()}.",
-            reason_zh="一个适合你此刻状态的小小可行步骤。",
-            rank=2,
-        ))
+        existing.items.append(_colour_item(colour, focus_copy, focus_label))
+        existing.items.append(_routine_item(profile_data, title_for_reason))
         db.flush()
 
         # Only genuinely skip the product step if it already succeeded once
@@ -227,8 +259,10 @@ def build_recommendation(
         recommendation_date=today,
         current_focus=focus_label,
         current_focus_zh=focus_copy["focus_zh"],
+        current_focus_ms=focus_copy["focus_ms"],
         summary=focus_copy["summary"],
         summary_zh=focus_copy["summary_zh"],
+        summary_ms=focus_copy["summary_ms"],
         colour_key=colour["key"],
         material_affinity=material_affinity,
         status="READY",
@@ -237,20 +271,8 @@ def build_recommendation(
     db.add(profile)
     db.flush()
 
-    profile.items.append(RecommendationItem(
-        type="COLOUR", reference_id=colour["key"],
-        title=colour["name"], title_zh=colour["name_zh"],
-        reason=f"Matched to your current focus — {focus_label.lower()}.",
-        reason_zh=f"根据你当前的重点——{focus_copy['focus_zh']}——为你匹配。",
-        rank=1,
-    ))
-    profile.items.append(RecommendationItem(
-        type="ROUTINE", reference_id=None,
-        title=profile_data["routine"], title_zh=profile_data["routine_zh"],
-        reason=f"A small, doable step suited to {title_for_reason.lower()}.",
-        reason_zh="一个适合你此刻状态的小小可行步骤。",
-        rank=2,
-    ))
+    profile.items.append(_colour_item(colour, focus_copy, focus_label))
+    profile.items.append(_routine_item(profile_data, title_for_reason))
     db.flush()
 
     narrative_prompt = build_narrative_prompt(db, user, snapshot=snapshot, focus_label=focus_label, colour=colour)

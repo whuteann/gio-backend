@@ -20,7 +20,8 @@ from app.schemas.reflection import (
 )
 from app.services import gamification as gam
 from app.services.ai_outcome import generate_reading_outcome
-from app.services.reading_language import OTHER_LANGUAGE, fill_secondary_language, set_field
+from app.services import languages
+from app.services.reading_language import fill_secondary_language, set_field
 from app.services.cascade import apply_reflection_side_effects
 from app.services.content import AFFIRMATIONS, INSIGHTS, REFLECTION_QUESTIONS
 from app.services.entitlement import INNER_READING_WEEKLY_FREE_LIMIT, inner_reading_weekly_count, is_premium_active
@@ -43,6 +44,10 @@ async def _generate_secondary_language(reading_id: uuid.UUID, language: str) -> 
     and makes sure a failure can never take down the worker: the reading is
     already saved and usable in its primary language, so it just stays
     PARTIAL rather than silently flipping to READY.
+
+    Queued once per language in languages.others(primary). FastAPI runs a
+    request's background tasks sequentially, so the two passes never race
+    over languages_ready.
     """
     db = SessionLocal()
     try:
@@ -51,7 +56,10 @@ async def _generate_secondary_language(reading_id: uuid.UUID, language: str) -> 
             return
         if await fill_secondary_language(db, reading, language):
             db.commit()
-            logger.info("Inner reading %s: %s version generated, now READY.", reading_id, language)
+            logger.info(
+                "Inner reading %s: %s generated, now %s (%s).",
+                reading_id, language, reading.generation_status, reading.languages_ready,
+            )
         else:
             db.rollback()
     except Exception:
@@ -113,9 +121,7 @@ async def submit_inner_reading(
     # The language the reading is written in now, synchronously. Falls back
     # to the account's preference when the client doesn't say, so an older
     # client keeps working.
-    language = payload.language if payload.language in ("en", "zh") else (user.preferred_language or "en")
-    if language not in ("en", "zh"):
-        language = "en"
+    language = languages.normalize(payload.language or user.preferred_language)
 
     personality = user.core_personality
     personality_title = personality.title_en if personality else None
@@ -136,17 +142,26 @@ async def submit_inner_reading(
         blueprint_version="reading-v1-ai",
         emotional_energy=dims["emotional_energy"], mental_clarity=dims["mental_clarity"],
         inner_pressure=dims["inner_pressure"], grounding=dims["grounding"],
-        # insight/reflection_question/current_focus come from material that is
-        # already bilingual — the curated library and the BilingualText fields
-        # — so both languages are stored now and never need the second pass.
+        # insight/reflection_question/current_focus come from material that
+        # already carries every language — the curated library and the
+        # LocalizedText fields — so all of them are stored now and never
+        # need a follow-up pass.
         insight=INSIGHTS[insight_id]["en"], insight_zh=INSIGHTS[insight_id]["zh"],
+        insight_ms=INSIGHTS[insight_id]["ms"],
         reflection_question=REFLECTION_QUESTIONS[reflection_question_id]["en"],
         reflection_question_zh=REFLECTION_QUESTIONS[reflection_question_id]["zh"],
+        reflection_question_ms=REFLECTION_QUESTIONS[reflection_question_id]["ms"],
         current_focus=ai_outcome.current_focus.en, current_focus_zh=ai_outcome.current_focus.zh,
+        current_focus_ms=ai_outcome.current_focus.ms,
         result_summary=f"Inner Reading — {ai_outcome.current_focus.en}",
         result_summary_zh=f"内在解读 — {ai_outcome.current_focus.zh}",
+        result_summary_ms=f"Bacaan Dalaman — {ai_outcome.current_focus.ms}",
         primary_language=language,
         generation_status="PARTIAL",
+        # The curated/LocalizedText fields above are already complete in
+        # every language; this tracks the heavy per-language body, which at
+        # this point exists only in `language`.
+        languages_ready=[language],
         started_at=now, completed_at=now, created_at=now,
     )
     # The generated body goes into whichever language column was asked for;
@@ -178,9 +193,9 @@ async def submit_inner_reading(
         narrative_content={
             "insight": INSIGHTS[insight_id],
             "reflection_question": REFLECTION_QUESTIONS[reflection_question_id],
-            "reminder": {"en": ai_outcome.reminder.en, "zh": ai_outcome.reminder.zh},
-            "current_focus": {"en": ai_outcome.current_focus.en, "zh": ai_outcome.current_focus.zh},
-            "friendly_advice": {"en": ai_outcome.friendly_advice.en, "zh": ai_outcome.friendly_advice.zh},
+            "reminder": ai_outcome.reminder.model_dump(),
+            "current_focus": ai_outcome.current_focus.model_dump(),
+            "friendly_advice": ai_outcome.friendly_advice.model_dump(),
             "affirmation": AFFIRMATIONS[affirmation_id],
         },
         affirmation_id=affirmation_id, insight_id=insight_id, reflection_question_id=reflection_question_id,
@@ -199,7 +214,10 @@ async def submit_inner_reading(
 
     # Queued after the commit, so the row the task loads in its own session
     # definitely exists. Runs once the response has been sent.
-    background_tasks.add_task(_generate_secondary_language, reading.id, OTHER_LANGUAGE[language])
+    # One task per remaining language — two of them now, where a two-language
+    # app queued exactly one.
+    for other in languages.others(language):
+        background_tasks.add_task(_generate_secondary_language, reading.id, other)
 
     return InnerReadingSubmitResponse(
         reading_id=reading.id,

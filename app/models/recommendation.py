@@ -23,7 +23,9 @@ class RecommendationProfile(Base):
     # NULL on historical per-reflection profiles; one bundle per UTC day now.
     recommendation_date = Column(Date, nullable=True)
     current_focus_zh = Column(String, nullable=True)
+    current_focus_ms = Column(String, nullable=True)
     summary_zh = Column(String, nullable=True)
+    summary_ms = Column(String, nullable=True)
     current_focus = Column(String, nullable=False)
     summary = Column(String, nullable=False)
     # Colours are a backend-constant catalog (see app/services/catalog.py), not
@@ -41,6 +43,7 @@ class RecommendationProfile(Base):
     # AI half (a vendor/AI failure must not block the reflection submit).
     letter_en = Column(String, nullable=True)
     letter_zh = Column(String, nullable=True)
+    letter_ms = Column(String, nullable=True)
     status = Column(String, nullable=False, default="READY")
     generated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
 
@@ -65,7 +68,9 @@ class RecommendationItem(Base):
     type = Column(String, nullable=False)  # COLOUR | ROUTINE | PRODUCT | ...
     reference_id = Column(String, nullable=True)  # e.g. an external product id
     title_zh = Column(String, nullable=True)
+    title_ms = Column(String, nullable=True)
     reason_zh = Column(String, nullable=True)
+    reason_ms = Column(String, nullable=True)
     currency = Column(String, nullable=False, default="MYR", server_default="MYR")
     title = Column(String, nullable=False)
     reason = Column(String, nullable=False)

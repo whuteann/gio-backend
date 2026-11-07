@@ -1,5 +1,9 @@
 # The recommendation engine — how it works today
 
+**2026-11-07 casing update:** phone cases now match the recommended colour
+before AI selects a design. See [Colour-first casing recommendations](phone_case_colour_matching.md)
+for catalogue labels, same-day colour changes, historical picks and empty states.
+
 A reference audit, written before a round of changes to the engine and its
 results — so the "before" state is on record. Covers: what triggers a
 recommendation, what's deterministic vs. AI-generated, what gets persisted,

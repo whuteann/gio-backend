@@ -9,3 +9,4 @@ class LumenartProductOut(BaseModel):
     price: float | None
     currency: str
     destination_url: str | None
+    colour_keys: list[str] = []

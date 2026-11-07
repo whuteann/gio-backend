@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.dependencies import get_current_user, get_db
 from app.models.recommendation import RecommendationProfile
+from app.models.lumenart import LumenartProduct
 from app.models.user import User
 from app.schemas.recommendation import RecommendationOut
 from app.services.content import COLOURS
@@ -14,8 +15,16 @@ from app.services.recommendation import ensure_recommendation
 router = APIRouter(prefix="/recommendations", tags=["recommendations"])
 
 
-def _serialize(profile: RecommendationProfile) -> RecommendationOut:
+def _serialize(profile: RecommendationProfile, db: Session) -> RecommendationOut:
     colour = COLOURS[profile.colour_key]
+    # Response-time guard also covers historical/by-id profiles that never
+    # pass through today's builder. Never expose a cached mismatched case.
+    catalog = db.query(LumenartProduct).all()
+    allowed = {r.id for r in catalog if profile.colour_key in (r.colour_keys or [])}
+    items = [i for i in profile.items if i.type != "PHONE_CASE" or i.reference_id in allowed]
+    has_cases = any(i.type == "PHONE_CASE" for i in items)
+    known_catalogue = bool(catalog) and all(r.colour_keys is not None for r in catalog)
+    case_status = "READY" if has_cases else ("NO_MATCH" if known_catalogue and not allowed else "UNAVAILABLE")
     return RecommendationOut(
         id=profile.id,
         current_focus=profile.current_focus, current_focus_zh=profile.current_focus_zh,
@@ -24,9 +33,10 @@ def _serialize(profile: RecommendationProfile) -> RecommendationOut:
         colour_key=colour["key"], colour_name=colour["name"],
         colour_name_zh=colour["name_zh"], colour_name_ms=colour["name_ms"],
         colour_swatch=colour["swatch"],
+        phone_case_status=case_status,
         material_affinity=profile.material_affinity,
         letter_en=profile.letter_en, letter_zh=profile.letter_zh, letter_ms=profile.letter_ms,
-        status=profile.status, generated_at=profile.generated_at, items=profile.items,
+        status=profile.status, generated_at=profile.generated_at, items=items,
     )
 
 
@@ -47,7 +57,7 @@ def get_latest_recommendation(user: User = Depends(get_current_user), db: Sessio
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Complete a check-in or Inner Reading first.")
     db.commit()
     db.refresh(profile)
-    return _serialize(profile)
+    return _serialize(profile, db)
 
 
 @router.get("", response_model=list[RecommendationOut])
@@ -62,7 +72,7 @@ def list_recommendations(user: User = Depends(get_current_user), db: Session = D
     )
     if not is_premium_active(user.subscription):
         query = query.limit(1)
-    return [_serialize(p) for p in query.all()]
+    return [_serialize(p, db) for p in query.all()]
 
 
 @router.get("/{recommendation_id}", response_model=RecommendationOut)
@@ -79,4 +89,4 @@ def get_recommendation(recommendation_id: uuid.UUID, user: User = Depends(get_cu
     )
     if not profile:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Recommendation not found.")
-    return _serialize(profile)
+    return _serialize(profile, db)

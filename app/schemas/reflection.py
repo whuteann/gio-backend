@@ -34,7 +34,7 @@ class InnerReadingSubmitRequest(BaseModel):
     # Which language to write this reading in, synchronously. The other one
     # is generated in the background (readings.py). Optional so an older
     # client still works — the account's preferred_language is used then.
-    language: str = "en"
+    language: str | None = None
 
 
 class OutcomeOut(BaseModel):

@@ -4,7 +4,6 @@ import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import or_
 from sqlalchemy.dialects.postgresql import insert
 
 from app.database import SessionLocal

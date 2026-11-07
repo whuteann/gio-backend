@@ -87,6 +87,35 @@ class LanguageQueueIntegrationTests(unittest.TestCase):
         self.assertEqual(result["languages_ready"], ["en", "zh", "ms"])
         self.assertEqual(result["title_ms"], self.generated().title)
 
+    def test_omitted_language_uses_malay_account_preference(self):
+        with patch("app.api.v1.endpoints.core_personality.generate_core_personality_content", new=AsyncMock(return_value=self.generated())) as model:
+            response = self.client.post("/api/v1/core-personality/calculate", json={"date_of_birth": "1990-01-01"})
+            self.assertEqual(response.status_code, 201, response.text)
+            self.assertEqual(model.await_args.kwargs["language"], "ms")
+
+    def test_new_malay_reading_is_usable_before_other_languages_finish(self):
+        from app.schemas.ai_outcome import InnerReadingOutcomeGeneration
+        from app.services.content import AFFIRMATIONS, INSIGHTS, REFLECTION_QUESTIONS
+        localized = {"en": "Making room", "zh": "留出空间", "ms": "Memberi ruang"}
+        body = {key: "Tenang dan yakin." for key in (
+            "title", "subtitle", "narrative", "life_area_work", "life_area_relationships",
+            "life_area_personal_growth", "life_area_conflict_management")}
+        outcome = InnerReadingOutcomeGeneration(**body, insight_id=next(iter(INSIGHTS)),
+            reflection_question_id=next(iter(REFLECTION_QUESTIONS)), affirmation_id=next(iter(AFFIRMATIONS)),
+            reminder=localized, current_focus=localized, friendly_advice=localized, narrative_summary="QA only")
+        cascade = {"xp_awarded": 0, "bonus_awarded": False, "milestone": None, "new_badges": []}
+        with patch("app.api.v1.endpoints.readings.generate_reading_outcome", new=AsyncMock(return_value=outcome)) as model, patch("app.api.v1.endpoints.readings.apply_reflection_side_effects", return_value=cascade):
+            response = self.client.post("/api/v1/inner-readings", json={"answers": [
+                {"dimension": dimension, "question_text": "Local QA", "value": 3}
+                for dimension in ("emotional_energy", "mental_clarity", "inner_pressure", "grounding")]})
+        self.assertEqual(response.status_code, 201, response.text)
+        self.assertEqual(model.await_args.kwargs["language"], "ms")
+        reading = self.client.get("/api/v1/inner-readings/" + response.json()["reading_id"]).json()
+        self.assertEqual(reading["narrative_ms"], body["narrative"])
+        self.assertEqual(reading["languages_ready"], ["ms"])
+        self.assertIsNone(reading["life_area_insights_ms"])
+        self.assertEqual(self.db.query(self.Job).filter_by(user_id=self.user.id).count(), 2)
+
     def test_switch_from_en_to_ms_recovers_transient_failure_without_replacing_english(self):
         row = self.personality()
         original = row.title_en

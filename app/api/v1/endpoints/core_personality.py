@@ -43,7 +43,7 @@ async def calculate(
         response.status_code = status.HTTP_200_OK
         return existing
 
-    language = languages.normalize(payload.language)
+    language = languages.normalize(payload.language or user.preferred_language)
 
     birthday_number = calculate_birthday_number(payload.date_of_birth)
     life_path_number = calculate_life_path_number(payload.date_of_birth)

@@ -1,15 +1,15 @@
 import uuid
 from datetime import date, datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
-from app.database import SessionLocal
 from app.dependencies import get_current_user, get_db
 from app.models.personality import CorePersonality
 from app.models.user import User
 from app.schemas.core_personality import CalculateRequest, CorePersonalityResultOut
 from app.services import languages
+from app.services.content_language_jobs import enqueue_missing
 from app.services.ai_personality import generate_core_personality_content
 from app.services.numerology import (
     calculate_birthday_number,
@@ -21,56 +21,9 @@ from app.services.numerology import (
 router = APIRouter(prefix="/core-personality", tags=["core-personality"])
 
 
-async def _generate_secondary_language(core_personality_id: uuid.UUID, birthdate: str, language: str) -> None:
-    """Runs after the response is sent (FastAPI BackgroundTasks) — its own
-    short-lived DB session, since the request's session is already closed
-    by the time this runs.
-
-    Queued once per language in languages.others(primary); FastAPI runs a
-    request's background tasks sequentially, so the passes never race over
-    languages_ready."""
-    db = SessionLocal()
-    try:
-        personality = db.get(CorePersonality, core_personality_id)
-        if personality is None:
-            return
-
-        content = await generate_core_personality_content(
-            birthdate=birthdate,
-            birthday_number=personality.birthday_number,
-            life_path_number=personality.life_path_number,
-            talent_number=personality.talent_number,
-            colour_weights={
-                "scarlet": personality.scarlet_score,
-                "russet": personality.russet_score,
-                "gold": personality.gold_score,
-                "forest": personality.forest_score,
-                "ocean": personality.ocean_score,
-            },
-            language=language,
-        )
-
-        setattr(personality, f"title_{language}", content.title)
-        setattr(personality, f"subtitle_{language}", content.subtitle)
-        setattr(personality, f"overview_{language}", content.overview)
-        setattr(personality, f"birthday_number_points_{language}", [p.model_dump() for p in content.birthday_number_points])
-        setattr(personality, f"life_path_number_points_{language}", [p.model_dump() for p in content.life_path_number_points])
-        setattr(personality, f"talent_number_points_{language}", [p.model_dump() for p in content.talent_number_points])
-        setattr(personality, f"summary_{language}", content.summary)
-        # Two passes now, so "a pass finished" is not "the row is complete"
-        # — see languages.record_ready.
-        personality.languages_ready, personality.generation_status = languages.record_ready(
-            personality.languages_ready, language
-        )
-        db.commit()
-    finally:
-        db.close()
-
-
 @router.post("/calculate", response_model=CorePersonalityResultOut, status_code=status.HTTP_201_CREATED)
 async def calculate(
     payload: CalculateRequest,
-    background_tasks: BackgroundTasks,
     response: Response,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -85,6 +38,8 @@ async def calculate(
         if user.onboarding_completed_at is None:
             user.onboarding_completed_at = datetime.now(timezone.utc)
             db.commit()
+        enqueue_missing(db, "personalities", existing, user.preferred_language)
+        db.commit()
         response.status_code = status.HTTP_200_OK
         return existing
 
@@ -138,11 +93,8 @@ async def calculate(
     db.commit()
     db.refresh(personality)
 
-    # Two passes now, not one — see services/languages.others().
-    for other in languages.others(language):
-        background_tasks.add_task(
-            _generate_secondary_language, personality.id, payload.date_of_birth, other
-        )
+    enqueue_missing(db, "personalities", personality, user.preferred_language)
+    db.commit()
 
     return personality
 
@@ -157,6 +109,8 @@ def get_current(user: User = Depends(get_current_user), db: Session = Depends(ge
     personality = db.query(CorePersonality).filter_by(user_id=user.id).first()
     if personality is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Core Personality not yet calculated.")
+    enqueue_missing(db, "personalities", personality, user.preferred_language)
+    db.commit()
     return personality
 
 
@@ -165,4 +119,6 @@ def get_results(core_personality_id: uuid.UUID, user: User = Depends(get_current
     personality = db.get(CorePersonality, core_personality_id)
     if personality is None or personality.user_id != user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Core Personality not found.")
+    enqueue_missing(db, "personalities", personality, user.preferred_language)
+    db.commit()
     return personality

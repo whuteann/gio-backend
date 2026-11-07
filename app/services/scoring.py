@@ -103,28 +103,14 @@ def reading_content_for_plan(reading, premium: bool) -> dict:
     already stored on the row. category/emoji are never gated — basic
     listing metadata, not depth content."""
     tag = reading_category_and_emoji(reading)
-    if premium:
-        return {
-            "narrative": reading.narrative,
-            "narrative_zh": reading.narrative_zh,
-            "life_area_insights": reading.life_area_insights,
-            "life_area_insights_zh": reading.life_area_insights_zh,
-            "is_premium_content": True,
-            "category": tag["category"],
-            "emoji": tag["emoji"],
-        }
-    # Both languages are gated identically — truncating only the English
-    # column would hand a free user the full reading just by switching the
-    # app to Chinese.
-    return {
-        "narrative": truncate_words(reading.narrative, 100) if reading.narrative else reading.narrative,
-        "narrative_zh": truncate_words(reading.narrative_zh, 100) if reading.narrative_zh else reading.narrative_zh,
-        "life_area_insights": None,
-        "life_area_insights_zh": None,
-        "is_premium_content": False,
-        "category": tag["category"],
-        "emoji": tag["emoji"],
-    }
+    from app.services import languages
+    result = {"is_premium_content": premium, "category": tag["category"], "emoji": tag["emoji"]}
+    for language in languages.SUPPORTED:
+        suffix = languages.column_suffix(language)
+        narrative = getattr(reading, f"narrative{suffix}", None)
+        result[f"narrative{suffix}"] = narrative if premium or not narrative else truncate_words(narrative, 100)
+        result[f"life_area_insights{suffix}"] = getattr(reading, f"life_area_insights{suffix}", None) if premium else None
+    return result
 
 
 def score_from_birthdate(birthdate: str) -> dict:

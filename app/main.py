@@ -1,3 +1,6 @@
+import asyncio
+from contextlib import asynccontextmanager, suppress
+
 from fastapi import Depends, FastAPI, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
@@ -14,7 +17,22 @@ from app.api.v1.router import api_router
 from app.config import settings
 from app.dependencies import get_db
 
-app = FastAPI(title="Auren Backend", version="0.1.0")
+@asynccontextmanager
+async def lifespan(app):
+    from app.services.content_language_jobs import worker
+    stop = asyncio.Event()
+    task = asyncio.create_task(worker(stop)) if settings.language_worker_enabled else None
+    try:
+        yield
+    finally:
+        stop.set()
+        if task is not None:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
+
+app = FastAPI(title="Auren Backend", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

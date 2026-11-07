@@ -180,6 +180,40 @@ class LanguageQueueIntegrationTests(unittest.TestCase):
         self.db.expire_all()
         self.assertEqual(self.db.get(self.Personality, row.id).title_ms, "Completed elsewhere")
 
+    def test_application_lifespan_starts_the_retry_worker(self):
+        import time
+        from fastapi.testclient import TestClient
+        from app.config import settings
+        row = self.personality()
+        settings.language_worker_enabled = True
+        try:
+            with patch("app.services.ai_personality.generate_core_personality_content", new=AsyncMock(return_value=self.generated())):
+                with TestClient(self.api) as client:
+                    client.get("/api/v1/core-personality/current")
+                    deadline = time.monotonic() + 6
+                    status = None
+                    while time.monotonic() < deadline:
+                        self.db.expire_all()
+                        status = self.db.query(self.Job).filter_by(entity_id=row.id, language="ms").one().status
+                        if status == "DONE":
+                            break
+                        time.sleep(0.05)
+                    self.assertEqual(status, "DONE")
+        finally:
+            settings.language_worker_enabled = False
+
+    def test_historical_translation_rejects_missing_or_duplicate_keys(self):
+        from types import SimpleNamespace
+        from app.services.content_translation import TranslatedBatch, TranslatedEntry, translate_texts
+        client = SimpleNamespace(responses=SimpleNamespace(parse=AsyncMock()))
+        context = AsyncMock()
+        context.__aenter__.return_value = client
+        with patch("app.services.content_translation.AsyncOpenAI", return_value=context):
+            client.responses.parse.return_value = SimpleNamespace(output_parsed=TranslatedBatch(entries=[TranslatedEntry(key="0", text="Tenang")]))
+            self.assertEqual(asyncio.run(translate_texts({"0": "Calm"}, "ms")), {"0": "Tenang"})
+            with self.assertRaises(ValueError):
+                asyncio.run(translate_texts({"0": "Calm", "1": "Steady"}, "ms"))
+
     def test_malay_free_and_premium_reading_limits_match_other_languages(self):
         from app.services.scoring import reading_content_for_plan
         from types import SimpleNamespace

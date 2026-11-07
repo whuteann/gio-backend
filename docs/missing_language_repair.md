@@ -41,6 +41,37 @@ batch. Reload the affected dashboard and full result page with MS selected to
 verify the populated Malay fields. Repeat with `--language zh` if older results
 also lack Chinese.
 
-The frontend refreshes data on language changes and labels fallback content
-when the selected version is missing. That label does not claim a translation
-is complete or that one will arrive automatically.
+`scripts/backfill_display_languages.py` separately inventories and translates
+missing historical display fields: reading metadata, check-in titles, snapshot
+messages, and recommendation copy. It defaults to dry-run; writes require
+`--apply --yes-production`. Translation batches must return exactly the expected
+keys. Existing English/Chinese and any already-populated Malay values are kept.
+
+## Automatic recovery
+
+Migration `d706da913b21` adds `content_language_jobs`, with a unique job for each
+result/language. New personality calculations and readings enqueue their missing
+versions; authenticated reads also recover a missed enqueue. Actual fields decide
+readiness, so legacy READY flags do not conceal missing versions.
+
+The application lifespan runs one worker per app process. PostgreSQL row locks
+prevent duplicate claims across processes. Jobs get four attempts with delayed
+retries; an interrupted worker's lease expires after ten minutes. A clean shutdown
+requeues its active job. Exhausted jobs remain FAILED for diagnosis rather than
+looping indefinitely. No prompts or generated text are stored in the job table.
+
+The frontend refreshes on language changes and quietly polls pending selected
+versions for up to five minutes, preserving the displayed page and unsaved drafts.
+Fallback copy stays labelled until the selected version exists. Persistent outages
+can still leave a version unavailable after all retries; inspect FAILED jobs.
+
+For deployment, apply the additive migration from a staged checkout before
+updating the live checkout; this keeps the old application working while the table
+is created. No dependencies or compose changes are required. `LANGUAGE_WORKER_ENABLED`
+defaults to true and can be disabled for isolated tests.
+
+Integration tests require a disposable database whose name is exactly
+`auren_language_qa`, and `AUREN_TEST_DATABASE=auren_language_qa`. They refuse a
+production database, mock generation failures, and cover language switching,
+new Malay results, duplicate enqueues, retries, leases, worker startup, and plan
+limits in Malay. Keep real model smoke tests isolated from live user accounts.

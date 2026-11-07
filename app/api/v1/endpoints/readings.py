@@ -1,12 +1,10 @@
-import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from starlette.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session, selectinload
 
-from app.database import SessionLocal
 from app.dependencies import get_current_user, get_db
 from app.models.reflection import InnerReading, InnerReadingAnswer
 from app.models.user import User
@@ -21,7 +19,8 @@ from app.schemas.reflection import (
 from app.services import gamification as gam
 from app.services.ai_outcome import generate_reading_outcome
 from app.services import languages
-from app.services.reading_language import fill_secondary_language, set_field
+from app.services.reading_language import set_field
+from app.services.content_language_jobs import enqueue_missing
 from app.services.cascade import apply_reflection_side_effects
 from app.services.content import AFFIRMATIONS, INSIGHTS, REFLECTION_QUESTIONS
 from app.services.entitlement import INNER_READING_WEEKLY_FREE_LIMIT, inner_reading_weekly_count, is_premium_active
@@ -29,48 +28,7 @@ from app.services.narrative import lock_user, create_narrative_entry, get_or_cre
 from app.services.questions import get_or_generate_reading_question_set, next_inner_reading_increment
 from app.services.scoring import dimension_averages, focus_label_for, normalize, reading_content_for_plan, resolve_focus_key
 
-logger = logging.getLogger(__name__)
-
 router = APIRouter(prefix="/inner-readings", tags=["inner-readings"])
-
-async def _generate_secondary_language(reading_id: uuid.UUID, language: str) -> None:
-    """Fills in the language the user did not ask for, after the response has
-    already gone out (FastAPI BackgroundTasks) — same shape as
-    core_personality.py::_generate_secondary_language, including its own
-    short-lived session, since the request's is closed by the time this runs.
-
-    The generation itself lives in services/reading_language.py, shared with
-    scripts/backfill_reading_language.py. This wrapper only owns the session
-    and makes sure a failure can never take down the worker: the reading is
-    already saved and usable in its primary language, so it just stays
-    PARTIAL rather than silently flipping to READY.
-
-    Queued once per language in languages.others(primary). FastAPI runs a
-    request's background tasks sequentially, so the two passes never race
-    over languages_ready.
-    """
-    db = SessionLocal()
-    try:
-        reading = db.get(InnerReading, reading_id)
-        if reading is None:
-            return
-        if await fill_secondary_language(db, reading, language):
-            db.commit()
-            logger.info(
-                "Inner reading %s: %s generated, now %s (%s).",
-                reading_id, language, reading.generation_status, reading.languages_ready,
-            )
-        else:
-            db.rollback()
-    except Exception:
-        logger.exception("Inner reading %s: background %s generation crashed.", reading_id, language)
-        db.rollback()
-    finally:
-        db.close()
-
-
-
-
 
 def _serialize(reading: InnerReading, premium: bool) -> InnerReadingOut:
     base = InnerReadingOut.model_validate(reading)
@@ -95,7 +53,6 @@ async def get_questions(user: User = Depends(get_current_user), db: Session = De
 @router.post("", response_model=InnerReadingSubmitResponse, status_code=status.HTTP_201_CREATED)
 async def submit_inner_reading(
     payload: InnerReadingSubmitRequest,
-    background_tasks: BackgroundTasks,
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -212,12 +169,8 @@ async def submit_inner_reading(
 
     db.commit()
 
-    # Queued after the commit, so the row the task loads in its own session
-    # definitely exists. Runs once the response has been sent.
-    # One task per remaining language — two of them now, where a two-language
-    # app queued exactly one.
-    for other in languages.others(language):
-        background_tasks.add_task(_generate_secondary_language, reading.id, other)
+    enqueue_missing(db, "readings", reading, user.preferred_language)
+    db.commit()
 
     return InnerReadingSubmitResponse(
         reading_id=reading.id,
@@ -237,6 +190,9 @@ def list_inner_readings(user: User = Depends(get_current_user), db: Session = De
         .order_by(InnerReading.created_at.desc())
         .all()
     )
+    for reading in readings:
+        enqueue_missing(db, "readings", reading, user.preferred_language)
+    db.commit()
     return [_serialize(r, premium) for r in readings]
 
 
@@ -250,4 +206,6 @@ def get_inner_reading(reading_id: uuid.UUID, user: User = Depends(get_current_us
     )
     if not reading:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inner Reading not found.")
+    enqueue_missing(db, "readings", reading, user.preferred_language)
+    db.commit()
     return _serialize(reading, is_premium_active(user.subscription))

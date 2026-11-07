@@ -8,7 +8,7 @@ from app.schemas.common import NumberPoint
 
 class CalculateRequest(BaseModel):
     date_of_birth: str = Field(description="YYYY-MM-DD")
-    language: str = "en"  # services/languages.SUPPORTED
+    language: str | None = None  # omitted: use the account preference
 
 
 class CorePersonalityResultOut(BaseModel):

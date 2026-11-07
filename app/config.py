@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     refresh_token_expire_days: int = 30
     openai_api_key: str = ""
     openai_model: str = "gpt-4.1"
+    language_worker_enabled: bool = True
     # Xendit payment gateway (docs/behaviour_log_0009.md). Xendit has no
     # separate sandbox hostname — test vs live is purely which secret key
     # is configured here, both against the same api.xendit.co. `xendit_environment`

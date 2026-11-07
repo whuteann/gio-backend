@@ -37,6 +37,10 @@ class RecommendationProfile(Base):
     # vendor-fetch `type=` filter and as the "Material Affinity" key-info
     # shown on the recommendation detail page.
     material_affinity = Column(String, nullable=True)
+    # Cases follow the displayed colour even when it changes within a day.
+    phone_case_colour_key = Column(String, nullable=True)
+    phone_case_checked_at = Column(DateTime(timezone=True), nullable=True)
+    phone_case_status = Column(String, nullable=True)  # READY | NO_MATCH | UNAVAILABLE
     # The one unifying bilingual "letter" tying focus pillar + colour +
     # material + picks together — app/services/ai_recommendation.py.
     # Nullable: pre-dates this column, and best-effort like the rest of the

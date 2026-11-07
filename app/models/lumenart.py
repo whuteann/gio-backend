@@ -1,4 +1,5 @@
 from sqlalchemy import Column, DateTime, Numeric, String
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 
 from app.database import Base
@@ -20,4 +21,6 @@ class LumenartProduct(Base):
     image_url = Column(String, nullable=True)
     price = Column(Numeric(10, 2), nullable=True)
     currency = Column(String, nullable=True)
+    colour_keys = Column(JSONB, nullable=True)  # None means pre-colour cache; [] means reviewed/unclassified, no match.
+    design_description = Column(String, nullable=True)
     fetched_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)

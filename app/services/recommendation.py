@@ -12,13 +12,15 @@ deterministic focus->colour matching this always used (a direct port of
 lib/recommendation.ts, not AI either).
 
 `RecommendationProfile` is now a **daily** artifact, not a per-submission
-one (docs/behaviour_log_0012.md, decision 4): at most one live product
+one (docs/behaviour_log_0012.md, decision 4): at most one successful stone-product
 fetch + AI pick happens per user per UTC day. A user's first
 check-in/reading of a new day creates a fresh profile and runs the full
 pipeline; any later submission that same day updates the same profile's
 COLOUR/ROUTINE items (cheap, deterministic — might as well reflect the
 latest focus) but leaves its PRODUCT items untouched, carried forward
-rather than re-fetched/re-picked. This relies on the caller having already
+rather than re-fetched/re-picked. Phone cases now follow the latest displayed
+colour even within the day; see docs/phone_case_colour_matching.md.
+This relies on the caller having already
 serialized concurrent requests for this user via
 `app/services/narrative.py::lock_user` before reaching here — see
 checkins.py/readings.py, which call it up front — so the
@@ -28,7 +30,7 @@ checkins.py/readings.py, which call it up front — so the
 import asyncio
 import logging
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 
 from sqlalchemy.orm import Session
@@ -38,10 +40,11 @@ from app.database import SessionLocal
 from app.models.recommendation import RecommendationItem, RecommendationProfile
 from app.models.reflection import InnerStateSnapshot
 from app.models.user import User
-from app.services.ai_recommendation import generate_recommendation
+from app.services.ai_recommendation import generate_recommendation, generate_phone_case_recommendation
 from app.services.content import COLOURS, FOCUS_COPY, FOCUS_TO_COLOUR, FOCUS_TO_MATERIAL, STONE_TYPES
 from app.services.gamification import today_utc
 from app.services.lumenart import get_phone_case_candidates
+from app.services.phone_case_colours import matching_cases
 from app.services.narrative import lock_user
 from app.services.narrative_prompt import build_narrative_prompt
 from app.services import languages
@@ -61,7 +64,8 @@ def _parse_price(raw: str | None) -> Decimal | None:
 
 
 async def _fetch_and_pick(
-    *, db: Session, colour_key: str, material_affinity: str, focus_label: str, narrative_prompt: str
+    *, db: Session, colour_key: str, material_affinity: str, focus_label: str, narrative_prompt: str,
+    include_phone_cases: bool = True,
 ) -> dict:
     # Phone case candidates come from a sync, DB-backed lazy cache (see
     # lumenart.py) rather than a live vendor call, so there's nothing to
@@ -69,12 +73,13 @@ async def _fetch_and_pick(
     # types are fetched (same colour, different `type=`) so the product
     # set can carry one pick per type rather than 3 from whichever single
     # type the focus happened to match.
-    phone_case_candidates = get_phone_case_candidates(db)
+    phone_case_candidates = matching_cases(get_phone_case_candidates(db), colour_key) if include_phone_cases else []
     type_results = await asyncio.gather(*(fetch_products(colour_key, stone_type=t) for t in STONE_TYPES))
     stone_candidates_by_type = dict(zip(STONE_TYPES, type_results))
     return await generate_recommendation(
         narrative_prompt=narrative_prompt, focus_label=focus_label, material_affinity=material_affinity,
         stone_candidates_by_type=stone_candidates_by_type, phone_case_candidates=phone_case_candidates,
+        colour_key=colour_key,
     )
 
 
@@ -157,6 +162,7 @@ def _phone_case_item(product: dict, *, rank: int) -> RecommendationItem:
 def _refresh_product_items(
     profile: RecommendationProfile, *, db: Session, colour_key: str, material_affinity: str, focus_label: str,
     narrative_prompt: str, next_rank: int,
+    include_phone_cases: bool = True,
 ) -> None:
     """Best-effort: any failure here (vendor API down, AI call failing)
     leaves the profile with no PRODUCT/PHONE_CASE items and no letter
@@ -166,6 +172,7 @@ def _refresh_product_items(
         result = asyncio.run(_fetch_and_pick(
             db=db, colour_key=colour_key, material_affinity=material_affinity, focus_label=focus_label,
             narrative_prompt=narrative_prompt,
+            include_phone_cases=include_phone_cases,
         ))
     except Exception:
         logger.exception(
@@ -175,6 +182,11 @@ def _refresh_product_items(
         result = {**{f"letter_{code}": "" for code in languages.SUPPORTED},
                   "feature": None, "others": [], "phone_case": []}
 
+    # Retrying missing stone picks must not append duplicate phone cases.
+    replace_types = ("PRODUCT", "PHONE_CASE") if include_phone_cases else ("PRODUCT",)
+    for item in [i for i in profile.items if i.type in replace_types]:
+        profile.items.remove(item)
+        db.delete(item)
     for code in languages.SUPPORTED:
         setattr(profile, f"letter_{code}", result.get(f"letter_{code}") or None)
 
@@ -188,6 +200,69 @@ def _refresh_product_items(
     for product in result["phone_case"]:
         profile.items.append(_phone_case_item(product, rank=rank))
         rank += 1
+    if include_phone_cases:
+        _record_case_selection(profile, db=db, colour_key=colour_key, succeeded=bool(result["phone_case"]))
+    else:
+        # Stones can recover on a later load without moving/duplicating cases.
+        for item in [i for i in profile.items if i.type == "PHONE_CASE"]:
+            item.rank = rank
+            rank += 1
+
+
+def _record_case_selection(profile: RecommendationProfile, *, db: Session, colour_key: str, succeeded: bool) -> None:
+    from app.models.lumenart import LumenartProduct
+    # Read the cache only: don't repeat a failed upstream refresh in one request.
+    rows = db.query(LumenartProduct).all()
+    has_match = any(colour_key in (r.colour_keys or []) for r in rows)
+    known_catalogue = bool(rows) and all(r.colour_keys is not None for r in rows)
+    profile.phone_case_colour_key = colour_key
+    profile.phone_case_checked_at = datetime.now(timezone.utc)
+    profile.phone_case_status = "READY" if succeeded else ("NO_MATCH" if known_catalogue and not has_match else "UNAVAILABLE")
+
+
+def _sync_phone_case_items(profile: RecommendationProfile, *, db: Session, colour_key: str,
+                          narrative_prompt_factory) -> None:
+    """Keep cases aligned with the current colour without replacing daily stones.
+
+    Also upgrades legacy picks. Successful same-colour picks stay stable. Missing
+    matches / model failures retry after 10 minutes, not on every page load.
+    Catalogue refreshes can remove a previously eligible design immediately.
+    """
+    all_candidates = get_phone_case_candidates(db)
+    candidates = matching_cases(all_candidates, colour_key)
+    allowed_ids = {str(c["id"]) for c in candidates}
+    removed = False
+    for item in [i for i in profile.items if i.type == "PHONE_CASE" and i.reference_id not in allowed_ids]:
+        profile.items.remove(item)
+        db.delete(item)
+        removed = True
+    current = [i for i in profile.items if i.type == "PHONE_CASE"]
+    now = datetime.now(timezone.utc)
+    if profile.phone_case_colour_key == colour_key and not removed:
+        if current and profile.phone_case_status == "READY":
+            return
+        if profile.phone_case_checked_at and now - profile.phone_case_checked_at < timedelta(minutes=10):
+            return
+    if not candidates:
+        _record_case_selection(profile, db=db, colour_key=colour_key, succeeded=False)
+        return
+    try:
+        picks = asyncio.run(generate_phone_case_recommendation(
+            narrative_prompt=narrative_prompt_factory(), colour_key=colour_key, phone_case_candidates=candidates))
+    except Exception:
+        logger.exception("Colour-matched phone case selection failed for profile %s", profile.id)
+        _record_case_selection(profile, db=db, colour_key=colour_key, succeeded=False)
+        return
+    for item in current:
+        profile.items.remove(item)
+        db.delete(item)
+    rank = max((i.rank for i in profile.items), default=2) + 1
+    for product in picks:
+        if str(product.get("id")) in allowed_ids:
+            profile.items.append(_phone_case_item(product, rank=rank))
+            rank += 1
+    _record_case_selection(profile, db=db, colour_key=colour_key,
+                           succeeded=any(i.type == "PHONE_CASE" for i in profile.items))
 
 
 def build_recommendation(
@@ -244,8 +319,15 @@ def build_recommendation(
             _refresh_product_items(
                 existing, db=db, colour_key=colour["key"], material_affinity=material_affinity, focus_label=focus_label,
                 narrative_prompt=narrative_prompt, next_rank=3,
+                include_phone_cases=False,
             )
             db.flush()
+        _sync_phone_case_items(
+            existing, db=db, colour_key=colour["key"],
+            narrative_prompt_factory=lambda: build_narrative_prompt(
+                db, user, snapshot=snapshot, focus_label=focus_label, colour=colour),
+        )
+        db.flush()
         return existing
 
     profile = RecommendationProfile(

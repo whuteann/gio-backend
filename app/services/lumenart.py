@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.lumenart import LumenartProduct
+from app.services.phone_case_colours import product_colour_keys
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,8 @@ query GetProducts($after: String) {
       title
       handle
       status
+      description
+      aurenColours: metafield(namespace: "custom", key: "auren_colour_keys") { type value }
       featuredMedia {
         ... on MediaImage {
           image { url }
@@ -116,15 +119,18 @@ def _fetch_all_products(client: httpx.Client, token: str) -> list[dict]:
         response.raise_for_status()
         payload = response.json()
         if payload.get("errors"):
-            logger.warning("LumenArt GraphQL returned errors: %s", payload["errors"])
-            break
-        data = (payload.get("data") or {}).get("products") or {}
+            raise ValueError("LumenArt GraphQL errors; refusing a partial cache replacement")
+        data = (payload.get("data") or {}).get("products")
+        if not isinstance(data, dict) or not isinstance(data.get("nodes"), list):
+            raise ValueError("LumenArt catalog response is incomplete")
         products.extend(data.get("nodes") or [])
         page_info = data.get("pageInfo") or {}
         if not page_info.get("hasNextPage"):
-            break
+            return products
         after = page_info.get("endCursor")
-    return products
+        if not after:
+            raise ValueError("LumenArt pagination cursor missing")
+    raise ValueError("LumenArt catalog pagination limit exceeded")
 
 
 def _refresh_cache(db: Session) -> None:
@@ -156,6 +162,8 @@ def _refresh_cache(db: Session) -> None:
             image_url=image.get("url"),
             price=_parse_decimal(min_price.get("amount")),
             currency=min_price.get("currencyCode"),
+            colour_keys=product_colour_keys(raw),
+            design_description=raw.get("description") or None,
             fetched_at=now,
         ))
     db.flush()
@@ -171,7 +179,8 @@ def get_phone_case_candidates(db: Session) -> list[dict]:
     which is what app/services/ai_recommendation.py and
     recommendation.py::_phone_case_item already expect."""
     newest = db.query(LumenartProduct.fetched_at).order_by(LumenartProduct.fetched_at.desc()).first()
-    is_stale = newest is None or (datetime.now(timezone.utc) - newest[0]) > _CACHE_TTL
+    legacy = db.query(LumenartProduct.id).filter(LumenartProduct.colour_keys.is_(None)).first()
+    is_stale = newest is None or legacy is not None or (datetime.now(timezone.utc) - newest[0]) > _CACHE_TTL
     if is_stale:
         try:
             _refresh_cache(db)
@@ -187,6 +196,8 @@ def get_phone_case_candidates(db: Session) -> list[dict]:
             "primary_image": row.image_url,
             "price": str(row.price) if row.price is not None else None,
             "currency": row.currency or "MYR",
+            "colour_keys": row.colour_keys or [],
+            "design_description": row.design_description,
         }
         for row in rows
     ]

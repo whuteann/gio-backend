@@ -52,6 +52,7 @@ class RecommendationOut(BaseModel):
     colour_name_zh: str
     colour_name_ms: str = ""
     colour_swatch: str
+    phone_case_status: str | None = None
     # The deterministic stone-type pick (Crystal | Nephrite | Jade) —
     # app/services/content.py::FOCUS_TO_MATERIAL. Null on profiles
     # generated before this column existed.

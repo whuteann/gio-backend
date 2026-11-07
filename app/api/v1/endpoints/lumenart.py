@@ -26,6 +26,7 @@ def list_lumenart_products(db: Session = Depends(get_db)):
             image_url=c.get("primary_image"),
             price=float(c["price"]) if c.get("price") is not None else None,
             currency=c.get("currency") or "MYR",
+            colour_keys=c.get("colour_keys") or [],
             destination_url=f"https://lumenart.store/products/{c['handle']}" if c.get("handle") else None,
         )
         for c in candidates
